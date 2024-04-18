@@ -17,6 +17,13 @@ class PolynomialDynamics {
         BRY_INL Polynomial<DIM, Basis::Power>& operator[](std::size_t j);
         BRY_INL const Polynomial<DIM, Basis::Power>& operator[](std::size_t j) const;
 
+        BRY_INL std::array<bry_deg_t, DIM> degrees() const;
+
+        /// @brief Compute the dynamics power matrix 'F'
+        /// @param m Max exponent of the dynamics (degree of barrier)
+        /// @return Dynamics composition matrix of size `p^d` by `m^d` 
+        Eigen::MatrixXd dynamicsPowerMatrix(bry_deg_t m) const;
+
     private:
         std::array<Polynomial<DIM, Basis::Power>, DIM> m_f;
 

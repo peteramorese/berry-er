@@ -15,10 +15,10 @@ class Composer {
     public:
         Composer(const std::shared_ptr<PolynomialDynamics<DIM>>& dynamics, bry_deg_t barrier_degree);
 
-        /// @brief Compute the composition matrix 'M'
+        /// @brief Compute the dynamics composition matrix 'F'
         /// @param covariance Covariance of the noise term 'v'
-        /// @return Barrier composition matrix 'M'
-        Eigen::MatrixXd compositionMatrix(const Eigen::Matrix<bry_float_t, DIM, DIM>& covariance);
+        /// @return Dynamics composition matrix of size
+        Eigen::MatrixXd dynamicsCompositionMatrix(const Eigen::Matrix<bry_float_t, DIM, DIM>& covariance);
 
     private:
         const std::shared_ptr<const PolynomialDynamics<DIM>> m_dynamics;
