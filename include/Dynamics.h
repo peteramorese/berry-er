@@ -12,7 +12,10 @@ namespace BRY {
 template <std::size_t DIM>
 class PolynomialDynamics {
     public:
-        PolynomialDynamics() {}
+        PolynomialDynamics() = delete;
+        
+        template <typename ... DEGS>
+        PolynomialDynamics(DEGS ... degrees);
     
         BRY_INL Polynomial<DIM, Basis::Power>& operator[](std::size_t j);
         BRY_INL const Polynomial<DIM, Basis::Power>& operator[](std::size_t j) const;
@@ -25,7 +28,7 @@ class PolynomialDynamics {
         Eigen::MatrixXd dynamicsPowerMatrix(bry_deg_t m) const;
 
     private:
-        std::array<Polynomial<DIM, Basis::Power>, DIM> m_f;
+        std::vector<Polynomial<DIM, Basis::Power>> m_f;
 
 };
 

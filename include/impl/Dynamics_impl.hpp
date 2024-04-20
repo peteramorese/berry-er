@@ -3,17 +3,28 @@
 #include "Dynamics.h"
 
 template <std::size_t DIM>
-BRY::Polynomial<DIM, Basis::Power>& BRY::PolynomialDynamics::operator[](std::size_t j) {
+template <typename ... DEGS>
+BRY::PolynomialDynamics<DIM>::PolynomialDynamics(DEGS ... degrees) 
+{
+    static_assert(is_uniform_convertible_type<bry_deg_t, DEGS...>(), "All parameters passed to ctor must be convertible to bry_deg_t");
+    ExponentVec<DIM> degree_vec = makeExponentVec(degrees...);
+    m_f.reserve(DIM);
+    for (bry_deg_t deg : degree_vec)
+        m_f.emplace_back(deg);
+}
+
+template <std::size_t DIM>
+BRY::Polynomial<DIM, BRY::Basis::Power>& BRY::PolynomialDynamics<DIM>::operator[](std::size_t j) {
     return m_f[j];
 }
 
 template <std::size_t DIM>
-const BRY::Polynomial<DIM, Basis::Power>& BRY::PolynomialDynamics::operator[](std::size_t j) const {
+const BRY::Polynomial<DIM, BRY::Basis::Power>& BRY::PolynomialDynamics<DIM>::operator[](std::size_t j) const {
     return m_f[j];
 }
 
 template <std::size_t DIM>
-BRY_INL std::array<bry_deg_t, DIM> BRY::PolynomialDynamics::degrees() const {
+std::array<BRY::bry_deg_t, DIM> BRY::PolynomialDynamics<DIM>::degrees() const {
     std::array<bry_deg_t, DIM> deg_array;
     for (std::size_t i = 0; i < DIM; ++i) {
         deg_array[i] = m_f[i].degree();
@@ -22,12 +33,14 @@ BRY_INL std::array<bry_deg_t, DIM> BRY::PolynomialDynamics::degrees() const {
 }
 
 template <std::size_t DIM>
-Eigen::MatrixXd BRY::PolynomialDynamics::dynamicsPowerMatrix(bry_deg_t m) const {
+Eigen::MatrixXd BRY::PolynomialDynamics<DIM>::dynamicsPowerMatrix(bry_deg_t m) const {
     auto deg_arr = degrees();
     BRY::bry_deg_t n_sum = std::accumulate(deg_arr.begin(), deg_arr.end(), 0);
     BRY::bry_deg_t p = m * n_sum;
-    BRY::bry_deg_t m_monoms = pow(m, DIM) + 1;
-    BRY::bry_deg_t p_monoms = pow(p, DIM) + 1;
+    BRY::bry_deg_t m_monoms = pow(m + 1, DIM);
+    BRY::bry_deg_t p_monoms = pow(p + 1, DIM);
+    DEBUG("p: " << p);
+    DEBUG("p_monoms: " << p_monoms);
 
     Eigen::MatrixXd F(p_monoms, m_monoms);
     F.col(0) = Eigen::VectorXd::Ones(p_monoms);
@@ -38,15 +51,20 @@ Eigen::MatrixXd BRY::PolynomialDynamics::dynamicsPowerMatrix(bry_deg_t m) const 
 
     std::array<Eigen::Tensor<bry_complex_t, DIM>, DIM> complex_tensors;
     for (std::size_t d = 0; d < DIM; ++d) {
-        Eigen::Tensor<bry_complex_t, DIM> padded_tensor = _BRY::expandToMatchSize<DIM>(m_f[d], p + 1);;
+        //const Eigen::Tensor<bry_float_t, DIM>& dynamics_tensor = m_f[d].tensor();
+        Eigen::Tensor<bry_float_t, DIM> padded_tensor = _BRY::expandToMatchSize<DIM>(m_f[d].tensor(), p + 1);;
+        DEBUG("Padded tensor size: " << padded_tensor.size());
         complex_tensors[d] = padded_tensor.template fft<Eigen::BothParts, Eigen::FFT_FORWARD>(dimensions);
     }
 
     // Temporary variable to hold the product of each dynamics polynomial
-    Eigen::Tensor<bry_complex_t, DIM> t_product(makeUniformArray<bry_deg_t, DIM>(p + 1));
+    Eigen::Tensor<bry_complex_t, DIM> product(makeUniformArray<bry_deg_t, DIM>(p + 1));
 
-    for (auto col_midx = mIdxW(DIM, m + 1); !col_midx.last(); ++col_midx) {
-        product.setOnes();
+    auto col_midx = mIdxW(DIM, m + 1);
+    ++col_midx;
+    for (; !col_midx.last(); ++col_midx) {
+        DEBUG("midx: " << col_midx);
+        product.setConstant(1.0);
         for (std::size_t d = 0; d < DIM; ++d) {
             bry_deg_t exponent = col_midx[d];
             if (exponent > 0)
@@ -58,7 +76,10 @@ Eigen::MatrixXd BRY::PolynomialDynamics::dynamicsPowerMatrix(bry_deg_t m) const 
         Eigen::Tensor<BRY::bry_float_t, DIM> product_coefficients = product.template fft<Eigen::RealPart, Eigen::FFT_REVERSE>(dimensions);
 
         std::array<bry_deg_t, 1> one_dim{{p_monoms}};
+        DEBUG("b4 size: " << product_coefficients.size());
+        DEBUG("col size: " << column.size());
         column = product_coefficients.reshape(one_dim);
+        DEBUG("af");
     }
 
     return F;
