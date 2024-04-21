@@ -4,10 +4,9 @@
 
 #include <array>
 
-namespace BRY {
+#include <Eigen/Dense>
 
-//template <std::size_t DIM, Basis BASIS = Basis::Power>
-//using PolyPtr = std::shared_ptr<Polynomial<DIM, BASIS>>;
+namespace BRY {
 
 template <std::size_t DIM>
 class PolynomialDynamics {

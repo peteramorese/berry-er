@@ -2,6 +2,8 @@
 
 #include "Dynamics.h"
 
+#include "berry/MultiIndex.h"
+
 template <std::size_t DIM>
 template <typename ... DEGS>
 BRY::PolynomialDynamics<DIM>::PolynomialDynamics(DEGS ... degrees) 
@@ -39,8 +41,6 @@ Eigen::MatrixXd BRY::PolynomialDynamics<DIM>::dynamicsPowerMatrix(bry_deg_t m) c
     BRY::bry_deg_t p = m * n_sum;
     BRY::bry_deg_t m_monoms = pow(m + 1, DIM);
     BRY::bry_deg_t p_monoms = pow(p + 1, DIM);
-    DEBUG("p: " << p);
-    DEBUG("p_monoms: " << p_monoms);
 
     Eigen::MatrixXd F(p_monoms, m_monoms);
     F.col(0) = Eigen::VectorXd::Ones(p_monoms);
@@ -51,9 +51,7 @@ Eigen::MatrixXd BRY::PolynomialDynamics<DIM>::dynamicsPowerMatrix(bry_deg_t m) c
 
     std::array<Eigen::Tensor<bry_complex_t, DIM>, DIM> complex_tensors;
     for (std::size_t d = 0; d < DIM; ++d) {
-        //const Eigen::Tensor<bry_float_t, DIM>& dynamics_tensor = m_f[d].tensor();
         Eigen::Tensor<bry_float_t, DIM> padded_tensor = _BRY::expandToMatchSize<DIM>(m_f[d].tensor(), p + 1);;
-        DEBUG("Padded tensor size: " << padded_tensor.size());
         complex_tensors[d] = padded_tensor.template fft<Eigen::BothParts, Eigen::FFT_FORWARD>(dimensions);
     }
 
@@ -63,7 +61,6 @@ Eigen::MatrixXd BRY::PolynomialDynamics<DIM>::dynamicsPowerMatrix(bry_deg_t m) c
     auto col_midx = mIdxW(DIM, m + 1);
     ++col_midx;
     for (; !col_midx.last(); ++col_midx) {
-        DEBUG("midx: " << col_midx);
         product.setConstant(1.0);
         for (std::size_t d = 0; d < DIM; ++d) {
             bry_deg_t exponent = col_midx[d];
@@ -76,10 +73,7 @@ Eigen::MatrixXd BRY::PolynomialDynamics<DIM>::dynamicsPowerMatrix(bry_deg_t m) c
         Eigen::Tensor<BRY::bry_float_t, DIM> product_coefficients = product.template fft<Eigen::RealPart, Eigen::FFT_REVERSE>(dimensions);
 
         std::array<bry_deg_t, 1> one_dim{{p_monoms}};
-        DEBUG("b4 size: " << product_coefficients.size());
-        DEBUG("col size: " << column.size());
         column = product_coefficients.reshape(one_dim);
-        DEBUG("af");
     }
 
     return F;
