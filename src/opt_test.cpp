@@ -1,69 +1,58 @@
-#include <coin/CoinMessageHandler.hpp>
-#include <coin/CoinPackedMatrix.hpp>
-#include <coin/CoinModel.hpp>
-#include <coin/ClpSimplex.hpp>
-
 #include <iostream>
+#include <memory>
 
-int main() {
-    // Define the objective coefficients
-    double objCoefficients[] = {3.0, 2.0};
+#include "ortools/linear_solver/linear_solver.h"
 
-    // Define the constraint matrix
-    int constraintIndices[] = {0, 1, 0, 1};
-    int constraintStarts[] = {0, 2, 4};
-    double constraintCoefficients[] = {2.0, 1.0, 4.0, -5.0};
-    CoinPackedMatrix matrix(false, 2, 2, 4, constraintCoefficients, constraintIndices, constraintStarts);
+namespace operations_research {
+void LinearProgrammingExample() {
+  std::unique_ptr<MPSolver> solver(MPSolver::CreateSolver("SCIP"));
+  if (!solver) {
+    LOG(WARNING) << "SCIP solver unavailable.";
+    return;
+  }
 
-    // Define the variable lower bounds
-    double lb[] = {0.0, 0.0};
+  const double infinity = solver->infinity();
+  // x and y are non-negative variables.
+  MPVariable* const x = solver->MakeNumVar(0.0, infinity, "x");
+  MPVariable* const y = solver->MakeNumVar(0.0, infinity, "y");
+  LOG(INFO) << "Number of variables = " << solver->NumVariables();
 
-    // Define the variable upper bounds
-    double ub[] = {COIN_DBL_MAX, COIN_DBL_MAX};
+  // x + 2*y <= 14.
+  MPConstraint* const c0 = solver->MakeRowConstraint(-infinity, 14.0);
+  c0->SetCoefficient(x, 1);
+  c0->SetCoefficient(y, 2);
 
-    // Define the constraint lower bounds
-    double constraintLowerBounds[] = {-COIN_DBL_MAX, -10.0};
+  // 3*x - y >= 0.
+  MPConstraint* const c1 = solver->MakeRowConstraint(0.0, infinity);
+  c1->SetCoefficient(x, 3);
+  c1->SetCoefficient(y, -1);
 
-    // Define the constraint upper bounds
-    double constraintUpperBounds[] = {20.0, COIN_DBL_MAX};
+  // x - y <= 2.
+  MPConstraint* const c2 = solver->MakeRowConstraint(-infinity, 2.0);
+  c2->SetCoefficient(x, 1);
+  c2->SetCoefficient(y, -1);
+  LOG(INFO) << "Number of constraints = " << solver->NumConstraints();
 
-    // Create the Coin LP solver
-    ClpSimplex solver;
+  // Objective function: 3x + 4y.
+  MPObjective* const objective = solver->MutableObjective();
+  objective->SetCoefficient(x, 3);
+  objective->SetCoefficient(y, 4);
+  objective->SetMaximization();
 
-    // Load the problem into the solver
-    solver.loadProblem(matrix, lb, ub, objCoefficients, constraintLowerBounds, constraintUpperBounds);
+  const MPSolver::ResultStatus result_status = solver->Solve();
+  // Check that the problem has an optimal solution.
+  if (result_status != MPSolver::OPTIMAL) {
+    LOG(FATAL) << "The problem does not have an optimal solution!";
+  }
 
-    // Solve the LP problem
-    solver.primal();
+  LOG(INFO) << "Solution:";
+  LOG(INFO) << "Optimal objective value = " << objective->Value();
+  LOG(INFO) << x->name() << " = " << x->solution_value();
+  LOG(INFO) << y->name() << " = " << y->solution_value();
+}
+}  // namespace operations_research
 
-    // Print the solution status
-    std::cout << "Solution Status: ";
-    switch (solver.status()) {
-        case 0:
-            std::cout << "Optimal" << std::endl;
-            break;
-        case 1:
-            std::cout << "Primal Infeasible" << std::endl;
-            break;
-        case 2:
-            std::cout << "Dual Infeasible" << std::endl;
-            break;
-        case 5:
-            std::cout << "Stopped" << std::endl;
-            break;
-        default:
-            std::cout << "Unknown" << std::endl;
-    }
-
-    // Print the optimal variable values
-    std::cout << "Optimal Values:" << std::endl;
-    const double* primalValues = solver.primalColumnSolution();
-    for (int i = 0; i < 2; ++i) {
-        std::cout << "x" << i << " = " << primalValues[i] << std::endl;
-    }
-
-    // Print the optimal objective function value
-    std::cout << "Optimal Objective Function Value (Max): " << solver.objectiveValue() << std::endl;
-
-    return 0;
+int main(int argc, char** argv) {
+  operations_research::LinearProgrammingExample();
+  return EXIT_SUCCESS;
 }

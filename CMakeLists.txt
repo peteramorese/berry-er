@@ -4,7 +4,7 @@ project(berry)
 
 find_package (Eigen3 3.3.8 REQUIRED NO_MODULE)
 find_package(Threads REQUIRED)
-#find_package(Coin REQUIRED)
+find_package(ortools REQUIRED)
 
 # TODO: Optionfy this
 set(CMAKE_BUILD_TYPE Debug)
@@ -25,6 +25,10 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/modules/berry)
 set(BRYR_DEPENDENCY_INCLUDE_DIRS 
     ${EIGEN3_INCLUDE_DIRS}
     ${BRY_INCLUDE_DIRS}
+)
+
+set(BRYR_DEPENDENCY_LIBS
+    ortools::ortools
 )
 
 set(BRYR_INCLUDE_DIRS 
