@@ -4,6 +4,7 @@ project(berry)
 
 find_package (Eigen3 3.3.8 REQUIRED NO_MODULE)
 find_package(Threads REQUIRED)
+#find_package(Coin REQUIRED)
 
 # TODO: Optionfy this
 set(CMAKE_BUILD_TYPE Debug)
@@ -25,6 +26,7 @@ set(BRYR_DEPENDENCY_INCLUDE_DIRS
     ${EIGEN3_INCLUDE_DIRS}
     ${BRY_INCLUDE_DIRS}
 )
+
 set(BRYR_INCLUDE_DIRS 
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include

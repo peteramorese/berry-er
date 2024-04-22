@@ -6,4 +6,5 @@ foreach(EXEC_FILE ${BRY_EXECUTABLES})
     target_include_directories(${EXEC_NAME} PRIVATE
         ${BRYR_INCLUDE_DIRS} 
     )
+    target_link_libraries(${EXEC_NAME} ${BRYR_DEPENDENCY_LIBS})
 endforeach()
