@@ -1,6 +1,7 @@
 #pragma once
 
 #include "berry/Polynomial.h"
+#include "berry/Types.h"
 
 #include <array>
 
@@ -20,6 +21,8 @@ class PolynomialDynamics {
         BRY_INL const Polynomial<DIM, Basis::Power>& operator[](std::size_t j) const;
 
         BRY_INL std::array<bry_deg_t, DIM> degrees() const;
+        BRY_INL bry_deg_t summedDegree() const; 
+        BRY_INL bry_deg_t composedDegree(bry_deg_t m) const; 
 
         /// @brief Compute the dynamics power matrix 'F'
         /// @param m Max exponent of the dynamics (degree of barrier)

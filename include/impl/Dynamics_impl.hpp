@@ -35,10 +35,21 @@ std::array<BRY::bry_deg_t, DIM> BRY::PolynomialDynamics<DIM>::degrees() const {
 }
 
 template <std::size_t DIM>
+bry_deg_t BRY::PolynomialDynamics<DIM>::summedDegree() const {
+    bry_deg_t n_sum = 0;
+    for (const auto& polynomial : m_f)
+        n_sum += polynomial.degree();
+    return n_sum;
+}
+
+template <std::size_t DIM>
+bry_deg_t BRY::PolynomialDynamics<DIM>::composedDegree(bry_deg_t m) const {
+    return m * summedDegree();
+}
+
+template <std::size_t DIM>
 Eigen::MatrixXd BRY::PolynomialDynamics<DIM>::dynamicsPowerMatrix(bry_deg_t m) const {
-    auto deg_arr = degrees();
-    BRY::bry_deg_t n_sum = std::accumulate(deg_arr.begin(), deg_arr.end(), 0);
-    BRY::bry_deg_t p = m * n_sum;
+    BRY::bry_deg_t p = composedDegree(m);
     BRY::bry_deg_t m_monoms = pow(m + 1, DIM);
     BRY::bry_deg_t p_monoms = pow(p + 1, DIM);
 

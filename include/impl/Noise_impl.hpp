@@ -11,7 +11,7 @@ BRY::Additive2ndMomentNoise<DIM>::Additive2ndMomentNoise(const Covariance<DIM>& 
 {}
 
 template <std::size_t DIM>
-Eigen::MatrixXd BRY::Additive2ndMomentNoise<DIM>::getAdditiveNoiseMatrix(bry_deg_t m) const {
+Eigen::MatrixXd BRY::Additive2ndMomentNoise<DIM>::additiveNoiseMatrix(bry_deg_t m) const {
     BRY::bry_deg_t m_monoms = pow(m + 1, DIM);
 
     Eigen::MatrixXd Gamma(m_monoms, m_monoms);
