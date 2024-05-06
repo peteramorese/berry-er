@@ -1,7 +1,7 @@
 #include "Dynamics.h"
 #include "Noise.h"
-#include "Transform.h"
 #include "HyperRectangle.h"
+#include "Synthesis.h"
 
 #include <iostream>
 
@@ -19,6 +19,24 @@ int main() {
         }
         std::cout << std::endl;
     };
+
+    constexpr std::size_t DIM = 1;
+    std::shared_ptr<PolynomialDynamics<DIM>> dynamics_ptr = std::make_shared<PolynomialDynamics<1>>(2);    
+    PolynomialDynamics<DIM>& dynamics = *dynamics_ptr;
+    dynamics[0].coeff(0) = 5;
+    dynamics[0].coeff(1) = 3;
+    dynamics[0].coeff(2) = 2;
+
+    Covariance<DIM> cov;
+    cov(0) = 5.0;
+    std::shared_ptr<Additive2ndMomentNoise<DIM>> noise_ptr = std::make_shared<Additive2ndMomentNoise<DIM>>(cov);
+
+    PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, 5);
+    synthesizer.initialize();
+    auto result = synthesizer.synthesize(5);
+    INFO("p_safe: " << result.p_safe);
+
+
 
     //PolynomialDynamics<2> dynamics(1, 1);    
     //dynamics[0].coeff(0, 0) = 5;
@@ -70,28 +88,6 @@ int main() {
     //p.coeff(3) = 0.0;
     //p.coeff(4) = 2.0;
 
-    HyperRectangle<2> set;
-    set.lower_bounds = {0.5, 0.5};
-    set.upper_bounds = {1.0, 1.0};
-
-    Polynomial<2> p(1);
-
-    p.coeff(0, 0) = 1;
-    p.coeff(1, 0) = 2;
-    p.coeff(0, 1) = 3;
-    p.coeff(1, 1) = -2;
-
-    Eigen::MatrixXd tf = Transform::affine(set, p.degree());
-
-    DEBUG("transform mat: \n" << tf);
-
-    DEBUG("p before: " << p);
-    //std::cout << p.tensor().transpose() << std::endl;
-    printVec(p.tensor());
-    auto p_tf = transform(p, tf);
-    DEBUG("p after: " << p_tf);
-    printVec(p_tf.tensor());
-    //std::cout << p_tf.tensor().transpose() << std::endl;
 
     return 0;
 }

@@ -28,7 +28,7 @@ class Synthesizer {
         void insertUnsafeSets(std::vector<HyperRectangle<DIM>>&& sets);
     
         virtual void initialize() = 0;
-        virtual void synthesize(uint32_t time_horizon) = 0;
+        virtual Result synthesize(uint32_t time_horizon) = 0;
 
     protected:
         Synthesizer() = default;
@@ -48,13 +48,15 @@ class PolyDynamicsSynthesizer : public Synthesizer<DIM> {
                                 bry_deg_t barrier_deg);
 
         virtual void initialize() override;
-        virtual void synthesize(uint32_t time_horizon) override;
+        virtual Synthesizer<DIM>::Result synthesize(uint32_t time_horizon) override;
 
     private:
         std::shared_ptr<PolynomialDynamics<DIM>> m_dynamics;
         std::shared_ptr<Additive2ndMomentNoise<DIM>> m_noise;
         std::unique_ptr<LPSolver> m_solver;
-        bry_deg_t m_barrier_deg
+        bry_deg_t m_barrier_deg;
 };
 
 }
+
+#include "impl/Synthesis_impl.hpp"

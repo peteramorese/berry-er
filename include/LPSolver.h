@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <Eigen/Core>
+#include <ortools/linear_solver/linear_solver.h>
 
 namespace BRY {
 
@@ -14,7 +15,7 @@ class LPSolver {
     public:
         struct Result {
             /// @brief Optimizer result
-            MPSolver::ResultStatus;
+            ort::MPSolver::ResultStatus status;
 
             /// @brief Probability of safety
             bry_float_t p_safe;
@@ -55,9 +56,11 @@ class LPSolver {
         std::unique_ptr<ort::MPSolver> m_solver;
         bry_deg_t m_n_monoms;
         bry_float_t m_inf;
-        std::vector<ort::MPVariable*>* m_beta;
+        std::vector<ort::MPVariable*> m_beta;
         ort::MPVariable* m_eta;
         ort::MPVariable* m_gamma;
 };
 
 }
+
+#include "impl/LPSolver_impl.hpp"

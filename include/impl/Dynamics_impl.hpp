@@ -35,7 +35,7 @@ std::array<BRY::bry_deg_t, DIM> BRY::PolynomialDynamics<DIM>::degrees() const {
 }
 
 template <std::size_t DIM>
-bry_deg_t BRY::PolynomialDynamics<DIM>::summedDegree() const {
+BRY::bry_deg_t BRY::PolynomialDynamics<DIM>::summedDegree() const {
     bry_deg_t n_sum = 0;
     for (const auto& polynomial : m_f)
         n_sum += polynomial.degree();
@@ -43,7 +43,7 @@ bry_deg_t BRY::PolynomialDynamics<DIM>::summedDegree() const {
 }
 
 template <std::size_t DIM>
-bry_deg_t BRY::PolynomialDynamics<DIM>::composedDegree(bry_deg_t m) const {
+BRY::bry_deg_t BRY::PolynomialDynamics<DIM>::composedDegree(bry_deg_t m) const {
     return m * summedDegree();
 }
 
