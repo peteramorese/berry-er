@@ -31,11 +31,41 @@ int main() {
     cov(0) = 5.0;
     std::shared_ptr<Additive2ndMomentNoise<DIM>> noise_ptr = std::make_shared<Additive2ndMomentNoise<DIM>>(cov);
 
-    PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, 5);
+    // Init set
+    std::vector<HyperRectangle<DIM>> init_sets(1);
+    init_sets[0].lower_bounds(0) = 0.2;
+    init_sets[0].upper_bounds(0) = 0.3;
+
+    // Unsafe set
+    std::vector<HyperRectangle<DIM>> unsafe_sets(1);
+    unsafe_sets[0].lower_bounds(0) = 0.5;
+    unsafe_sets[0].upper_bounds(0) = 0.7;
+
+    // Init set
+    std::vector<HyperRectangle<DIM>> safe_sets(1);
+    safe_sets[0].lower_bounds(0) = 0.0;
+    safe_sets[0].upper_bounds(0) = 0.5;
+    safe_sets[1].lower_bounds(0) = 0.7;
+    safe_sets[1].upper_bounds(0) = 1.0;
+
+    DEBUG("Identity: \n" << Eigen::MatrixXd::Identity(5, 2));
+
+    bry_deg_t deg = 5;
+    PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, deg);
+
+    synthesizer.insertInitialSets(std::move(init_sets));
+    synthesizer.insertUnsafeSets(std::move(unsafe_sets));
+    synthesizer.insertSafeSets(std::move(safe_sets));
+
     synthesizer.initialize();
     auto result = synthesizer.synthesize(5);
+    
     INFO("p_safe: " << result.p_safe);
 
+    Eigen::MatrixXd b_to_p = BernsteinBasisTransform<DIM>::getTfMatrix(deg);
+    auto certificate_power = transform(*result.certificate, b_to_p);
+
+    INFO("Barrier: " << certificate_power);
 
 
     //PolynomialDynamics<2> dynamics(1, 1);    

@@ -101,5 +101,7 @@ BRY::LPSolver::Result BRY::LPSolver::solve(uint32_t time_horizon) {
         beta_values(i) = m_beta[i]->solution_value();
     }
 
+    DEBUG("Beta values: " << beta_values);
+
     return Result{result_status, 1.0 - objective->Value(), std::move(beta_values)};
 }
