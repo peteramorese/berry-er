@@ -20,6 +20,9 @@ class LPSolver {
             /// @brief Probability of safety
             bry_float_t p_safe;
         
+            /// @brief eta (init set constraint) and gamma (expected increase constraint)
+            bry_float_t eta, gamma;
+
             /// @brief Optimal barrier coefficients
             Eigen::VectorXd beta_values;
         };

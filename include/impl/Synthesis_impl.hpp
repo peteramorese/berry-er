@@ -42,8 +42,10 @@ void BRY::PolyDynamicsSynthesizer<DIM>::initialize() {
     //Eigen::VectorXd eta_coeffs = Phi_inv_m * Eigen::VectorXd::Ones(Phi_inv_m.cols());
     Eigen::VectorXd eta_coeffs = Eigen::VectorXd::Ones(Phi_inv_m.cols());
     for (const HyperRectangle<DIM>& set : this->m_init_sets) {
-        Eigen::MatrixXd beta_coeffs = Phi_inv_m * set.transformationMatrix(m_barrier_deg) * Phi_m;
-        m_solver->addInitialSetConstraint(-beta_coeffs, eta_coeffs);
+        Eigen::MatrixXd beta_coeffs = -Phi_inv_m * set.transformationMatrix(m_barrier_deg) * Phi_m;
+        //DEBUG("Initial set beta coeffs: \n" << beta_coeffs);
+        //DEBUG("Initial set eta coeffs: \n" << eta_coeffs);
+        m_solver->addInitialSetConstraint(beta_coeffs, eta_coeffs);
     }
 
     // Unsafe sets
@@ -55,6 +57,8 @@ void BRY::PolyDynamicsSynthesizer<DIM>::initialize() {
     //DEBUG("lower obund: " << lower_bound);
     for (const HyperRectangle<DIM>& set : this->m_unsafe_sets) {
         Eigen::MatrixXd beta_coeffs = Phi_inv_m * set.transformationMatrix(m_barrier_deg) * Phi_m;
+        //DEBUG("Unsafe set beta coeffs: \n" << beta_coeffs);
+        //DEBUG("Unsafe set eta coeffs: \n" << eta_coeffs);
         m_solver->addUnsafeSetConstraint(beta_coeffs, eta_coeffs);
     }
 
@@ -62,21 +66,20 @@ void BRY::PolyDynamicsSynthesizer<DIM>::initialize() {
     if (this->m_safe_sets.empty())
         WARN("No safe sets were provided");
     Eigen::MatrixXd F_expec_Gamma = m_dynamics->dynamicsPowerMatrix(m_barrier_deg) * m_noise->additiveNoiseMatrix(m_barrier_deg);
-    DEBUG("expec gamma size: " << F_expec_Gamma.rows() << ", " << F_expec_Gamma.cols());
-    //Eigen::MatrixXd expec_Gamma = m_noise->additiveNoiseMatrix(m_barrier_deg);
+    DEBUG("F expec Gamma: \n" << F_expec_Gamma);
     Eigen::MatrixXd Phi_inv_p = BernsteinBasisTransform<DIM>::getInvTfMatrix(m_dynamics->composedDegree(m_barrier_deg));
-    DEBUG("phi inv p size: " << Phi_inv_p.rows() << ", " << Phi_inv_p.cols());
-    Eigen::VectorXd gamma_coeffs = Phi_inv_p * Eigen::VectorXd::Ones(Phi_inv_p.cols());
+    //Eigen::VectorXd gamma_coeffs = Phi_inv_p * Eigen::VectorXd::Ones(Phi_inv_p.cols());
+    Eigen::VectorXd gamma_coeffs = Eigen::VectorXd::Ones(Phi_inv_p.cols());
     ASSERT(F_expec_Gamma.rows() == Phi_inv_p.cols(), "Dimension mismatch between F and Phi inv (p)");
 
     for (const HyperRectangle<DIM>& set : this->m_safe_sets) {
-        DEBUG("B4 beta coeffs");
-        //DEBUG("phi inv p size: " << Phi_inv_p.rows() << ", " << Phi_inv_p.cols());
         Eigen::MatrixXd beta_coeffs = 
             Phi_inv_p * (F_expec_Gamma - Eigen::MatrixXd::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) 
             * set.transformationMatrix(m_barrier_deg) * Phi_m;
-        DEBUG("af beta coeffs");
-
+        //DEBUG("Safe set beta coeffs: \n" << beta_coeffs);
+        DEBUG("transformation matrix: \n" << set.transformationMatrix(m_barrier_deg));
+        DEBUG("matrix: \n" << (F_expec_Gamma - Eigen::MatrixXd::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) * set.transformationMatrix(m_barrier_deg));
+        DEBUG("Safe set Gamma coeffs: \n" << gamma_coeffs);
         m_solver->addSafeSetConstraint(beta_coeffs, gamma_coeffs);
     }
     this->m_initialized = true;
@@ -92,5 +95,10 @@ BRY::Synthesizer<DIM>::Result BRY::PolyDynamicsSynthesizer<DIM>::synthesize(uint
     typename Synthesizer<DIM>::Result result;
     result.p_safe = solver_result.p_safe;
     result.certificate.reset(new Polynomial<DIM, Basis::Bernstein>(solver_result.beta_values));
+
+    DEBUG("eta: " << solver_result.eta);
+    DEBUG("gamma: " << solver_result.gamma);
+    DEBUG("beta values: \n" << solver_result.beta_values);
+
     return result;
 }
