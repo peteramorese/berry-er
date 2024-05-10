@@ -1,16 +1,18 @@
-clear; close all; clc;
+clear;
+close all; clc;
 
 % p_1 = [1, 2; 3, -2];
 % 
 % p_2 = [3, 0.5; 1, -0.5];
 
-p_1 = [3, 0.5, -2.2, 1.3];
-
-p_2 = [3, 0.4, -1.408, 0.6656];
+p_1 = [2.26806, -17.6495, 60.0409, -116.617, 141.44, -109.688, 53.1114, 13.1215, -20.6003];
+p_3 = [1.56123, -2.96266, -52.0641, 340.117, -1002.13, 1761.75, -1982.68, 1416.46, -570.522, 397.115, -885.079, 885.668, -300.572]
+% p_2 = [1.21212, -2.42424, 3.0303];
 
 visPolynomial(p_1, 'red')
 hold on
-visPolynomial(p_2, 'green')
+visPolynomial(p_3, 'green')
+% visPolynomial(p_2, 'green')
 
 function visPolynomial(coeffs, color)
     if size(coeffs, 1) == 1

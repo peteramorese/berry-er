@@ -21,63 +21,51 @@ int main() {
     };
 
     constexpr std::size_t DIM = 1;
-    std::shared_ptr<PolynomialDynamics<DIM>> dynamics_ptr = std::make_shared<PolynomialDynamics<1>>(2);    
+    std::shared_ptr<PolynomialDynamics<DIM>> dynamics_ptr = std::make_shared<PolynomialDynamics<1>>(1);    
     PolynomialDynamics<DIM>& dynamics = *dynamics_ptr;
-    dynamics[0].coeff(0) = 2.5;
-    dynamics[0].coeff(1) = 2.3;
-    dynamics[0].coeff(2) = 2.2;
+    dynamics[0].coeff(0) = 0.0;
+    dynamics[0].coeff(1) = 0.99;
+    //dynamics[0].coeff(2) = 2.2;
 
     Covariance<DIM> cov;
-    cov(0) = 2.0;
+    cov(0) = 0.01;
     std::shared_ptr<Additive2ndMomentNoise<DIM>> noise_ptr = std::make_shared<Additive2ndMomentNoise<DIM>>(cov);
 
     // Init set
     std::vector<HyperRectangle<DIM>> init_sets(1);
-    init_sets[0].lower_bounds(0) = 0.2;
-    init_sets[0].upper_bounds(0) = 0.4;
+    init_sets[0].lower_bounds(0) = 0.4;
+    init_sets[0].upper_bounds(0) = 0.5;
 
     // Unsafe set
-    std::vector<HyperRectangle<DIM>> unsafe_sets(1);
+    std::vector<HyperRectangle<DIM>> unsafe_sets(2);
     unsafe_sets[0].lower_bounds(0) = 0.8;
     unsafe_sets[0].upper_bounds(0) = 1.0;
+    unsafe_sets[1].lower_bounds(0) = 0.0;
+    unsafe_sets[1].upper_bounds(0) = 0.1;
 
     // Init set
     std::vector<HyperRectangle<DIM>> safe_sets(1);
-    safe_sets[0].lower_bounds(0) = 0.0;
+    safe_sets[0].lower_bounds(0) = 0.2;
     safe_sets[0].upper_bounds(0) = 0.8;
     //safe_sets[1].lower_bounds(0) = 0.7;
     //safe_sets[1].upper_bounds(0) = 1.0;
 
-    Polynomial<DIM> p_test(3);
-    p_test.coeff(0) = 3;
-    p_test.coeff(1) = 0.5;
-    p_test.coeff(2) = -2.2;
-    p_test.coeff(3) = 1.3;
-    //3, 0.5, -2.2, 1.3
+    bry_deg_t deg = 12;
+    PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, deg);
 
-    Eigen::MatrixXd tf = safe_sets[0].transformationMatrix(3);
-    DEBUG("tf: \n" << tf);
-    Polynomial<DIM> p_test_tf = transform(p_test, tf);
+    synthesizer.insertInitialSets(std::move(init_sets));
+    synthesizer.insertUnsafeSets(std::move(unsafe_sets));
+    synthesizer.insertSafeSets(std::move(safe_sets));
 
-    DEBUG("p_test: " << p_test);
-    DEBUG("p_test: " << p_test_tf);
-
-    //bry_deg_t deg = 2;
-    //PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, deg);
-
-    //synthesizer.insertInitialSets(std::move(init_sets));
-    //synthesizer.insertUnsafeSets(std::move(unsafe_sets));
-    //synthesizer.insertSafeSets(std::move(safe_sets));
-
-    //synthesizer.initialize();
-    //auto result = synthesizer.synthesize(5);
+    synthesizer.initialize();
+    auto result = synthesizer.synthesize(2);
     
-    //INFO("p_safe: " << result.p_safe);
+    INFO("p_safe: " << result.p_safe);
 
-    //Eigen::MatrixXd b_to_p = BernsteinBasisTransform<DIM>::getTfMatrix(deg);
-    //auto certificate_power = transform(*result.certificate, b_to_p);
+    Eigen::MatrixXd b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(deg);
+    auto certificate_power = transform(*result.certificate, b_to_p);
 
-    //INFO("Barrier: " << certificate_power);
+    INFO("Barrier: " << certificate_power);
 
 
     

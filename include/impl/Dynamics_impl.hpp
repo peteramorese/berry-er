@@ -54,7 +54,8 @@ Eigen::MatrixXd BRY::PolynomialDynamics<DIM>::dynamicsPowerMatrix(bry_deg_t m) c
     BRY::bry_deg_t p_monoms = pow(p + 1, DIM);
 
     Eigen::MatrixXd F(p_monoms, m_monoms);
-    F.col(0) = Eigen::VectorXd::Ones(p_monoms);
+    F.col(0) = Eigen::VectorXd::Zero(p_monoms);
+    F(0, 0) = 1.0;
 
     std::array<bry_idx_t, DIM> dimensions;
     for (std::size_t d = 0; d < DIM; ++d)
