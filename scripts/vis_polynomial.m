@@ -1,47 +1,55 @@
 clear;
 close all; clc;
 
-% p_1 = [1, 2; 3, -2];
-% 
-% p_2 = [3, 0.5; 1, -0.5];
+% p_1 = [9.76708, -156.273, 1445.97, -8751.52, 35514.6, -99239.8, 194266, -264765, 236638, -102966, -48067, 120598, -103390, 52967.8, -17031.5, 3197.23, -233.738]
+% p_2 = [3.63296, 4.35819, -501.328, 5391.42, -32356.3, 128411, -359298, 734201, -1.11886e+06, 1.28533e+06, -1.11522e+06, 725537, -347482, 118379, -26973.7, 3647.67, -181.96]
+% p_3 = [5.55276, -67.956, 621.809, -4679.48, 27098.5, -118015, 385171, -944992, 1.75198e+06, -2.46398e+06, 2.62821e+06, -2.11202e+06, 1.25838e+06, -539325, 157297, -27968.4, 2324.79]
+% p_4 = [5.48782, -70.5304, 680.556, -5195.28, 29607.8, -124722, 390297, -914593, 1.61712e+06, -2.16779e+06, 2.20312e+06, -1.68598e+06, 955903, -389435, 107817, -18166.7, 1441.76]
 
-p_1 = [2.26806, -17.6495, 60.0409, -116.617, 141.44, -109.688, 53.1114, 13.1215, -20.6003];
-p_3 = [1.56123, -2.96266, -52.0641, 340.117, -1002.13, 1761.75, -1982.68, 1416.46, -570.522, 397.115, -885.079, 885.668, -300.572]
-% p_2 = [1.21212, -2.42424, 3.0303];
 
-visPolynomial(p_1, 'red')
-hold on
-visPolynomial(p_3, 'green')
+
+% visPolynomial(p_1, 'red')
+% hold on
 % visPolynomial(p_2, 'green')
+% visPolynomial(p_3, 'blue')
+% visPolynomial(p_4, 'cyan')
+
+p_1 = [1.33226, -2.94504, 5.35962, -1.82062, -1.15987, 0.32436, 0.343978, -1.14204, 6.08245, -3.66761, -11.2265, 8.77413, -5.76201, 6.13412, 6.96346, -7.59066]
+p_2 = [1.29518, 9.91237, -125.925, 522.41, -1208.31, 1755.74, -1574.82, 877.625, -310.413, 52.8058, -11.6566, -89.2114, 1133.33, -4701.69, 10874.8, -15801.7, 14173.4, -7102.7, 1581.09, -49.9871, 46.6264, 356.845, -4533.31, 18806.8, -43499.3, 63206.8, -56693.6, 26896.8, -3809.83, -834.856, -108.795, -832.639, 10577.7, -43882.5, 101498, -147482, 132305, -55536.1, -2998.29, 6705.09, 163.192, 1248.96, -15492.5, 63204.9, -144391, 208130, -185453, 50723.2, 46918.5, -25540.1, 2173.72, -14905.3, 47873.6, -95645.8, 129339, -118099, 59967.1, 85411.8, -153420, 57622.6, -9238.86, 58499.5, -158689, 234479, -182058, 16337.7, 126118, -244593, 235599, -76099.5, 13974.9, -91419.3, 253083, -385475, 344715, -157345, -21138.4, 152044, -162576, 53395.8, -9336, 63839, -183771, 298438, -318693, 249515, -142935, 25070.2, 34857.2, -16514.5, 2335.62, -16707.7, 49943.4, -85745.8, 103423, -100217, 75231.9, -33791.7, 4159.23, 1262.17]
+visPolynomial2(p_2)
 
 function visPolynomial(coeffs, color)
-    if size(coeffs, 1) == 1
-        x = linspace(0, 1, 100);
-        
-        % Evaluate the polynomial
-        y = polyval(flip(coeffs), x);
-        
-        % Plot the polynomial
-        plot(x, y, 'b', 'LineWidth', 2, 'Color', color);
-        xlabel('x');
-        ylabel('y');
-        title('Visualization of Polynomial');
-        grid on;
-    else
-        [x, y] = meshgrid(linspace(0, 1, 100), linspace(0, 1, 100));
-        
-        % Evaluate the 2D polynomial
-        z = polyval2(coeffs, x, y);
-        
-        % Plot the 2D polynomial
-        surf(x, y, z);
-        xlabel('x');
-        ylabel('y');
-        zlabel('z');
-        title('Visualization of 2D Polynomial');
-        colormap(jet); % Change the colormap if desired
-        % colorbar; % Add a colorbar to show the scale
-    end
+    x = linspace(0, 1, 100);
+    
+    % Evaluate the polynomial
+    y = polyval(flip(coeffs), x);
+    
+    % Plot the polynomial
+    plot(x, y, 'b', 'LineWidth', 2, 'Color', color);
+    xlabel('x');
+    ylabel('y');
+    title('Visualization of Polynomial');
+    grid on;
+end
+
+function visPolynomial2(coeffs)
+    [x, y] = meshgrid(linspace(0, 1, 100), linspace(0, 1, 100));
+
+    deg = sqrt(length(coeffs));
+    coeffs = reshape(coeffs, deg, deg);
+    disp(coeffs)
+    
+    % Evaluate the 2D polynomial
+    z = polyval2(coeffs, x, y);
+    
+    % Plot the 2D polynomial
+    surf(x, y, z);
+    xlabel('x');
+    ylabel('y');
+    zlabel('z');
+    title('Visualization of 2D Polynomial');
+    colormap(jet); 
+    % colorbar; % Add a colorbar to show the scale
 end
 
 function z = polyval2(coeffs, x, y)
@@ -49,7 +57,6 @@ function z = polyval2(coeffs, x, y)
     for grid_i = 1:size(z, 1)
         for grid_j = 1:size(z, 2)
             for j = 1:size(coeffs, 2)
-                
                 z(grid_i, grid_j) = z(grid_i, grid_j) + y(grid_i, grid_j)^(j - 1) * polyval(flip(coeffs(:, j)), x(grid_i, grid_j));
             end
         end

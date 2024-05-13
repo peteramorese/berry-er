@@ -18,13 +18,6 @@ BRY::LPSolver::LPSolver(const std::string& solver_id, bry_deg_t n_monoms)
         m_solver->MakeNumVarArray(n_monoms, 0.0, m_inf, "beta", &m_beta);
         m_eta = m_solver->MakeNumVar(0.0, m_inf, "eta");
         m_gamma = m_solver->MakeNumVar(0.0, m_inf, "gamma");
-
-        //// Enforce that all beta are positive
-        //for (bry_idx_t i = 0; i < n_monoms; ++i) {
-        //    ort::MPConstraint* row_constraint = m_solver->MakeRowConstraint(0.0, m_inf, "");
-        //    // Set only a single beta to have non zero coefficient
-        //    row_constraint->SetCoefficient(m_beta[i], 1);
-        //}
     }
 }
 
@@ -79,7 +72,6 @@ void BRY::LPSolver::addSafeSetConstraint(const Eigen::MatrixXd& beta_coeffs, con
         }
         // Eta does not appear in this constraint
         row_constraint->SetCoefficient(m_eta, 0.0);
-        //WARN("Gamma coeff: " << gamma_coeffs(i));
         row_constraint->SetCoefficient(m_gamma, gamma_coeffs(i));
     }
     INFO("[Safe set] Added " << rows << " constraints");

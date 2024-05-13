@@ -20,37 +20,81 @@ int main() {
         std::cout << std::endl;
     };
 
-    constexpr std::size_t DIM = 1;
-    std::shared_ptr<PolynomialDynamics<DIM>> dynamics_ptr = std::make_shared<PolynomialDynamics<1>>(1);    
+    constexpr std::size_t DIM = 2;
+    std::shared_ptr<PolynomialDynamics<DIM>> dynamics_ptr = std::make_shared<PolynomialDynamics<DIM>>(1, 1);    
     PolynomialDynamics<DIM>& dynamics = *dynamics_ptr;
-    dynamics[0].coeff(0) = 0.0;
-    dynamics[0].coeff(1) = 0.90;
-    //dynamics[0].coeff(2) = 2.2;
+    dynamics[0].coeff(0, 0) = 0.01;
+    dynamics[0].coeff(1, 0) = 0.90;
+    dynamics[0].coeff(0, 1) = 0.90;
+    dynamics[0].coeff(1, 1) = 0.95;
+    dynamics[1].coeff(0, 0) = 0.01;
+    dynamics[1].coeff(1, 0) = 0.90;
+    dynamics[1].coeff(0, 1) = 0.90;
+    dynamics[1].coeff(1, 1) = 0.95;
 
     Covariance<DIM> cov;
-    cov(0) = 0.01;
+    cov(0, 0) = 0.01;
+    cov(1, 0) = 0.00;
+    cov(0, 1) = 0.00;
+    cov(1, 1) = 0.01;
     std::shared_ptr<Additive2ndMomentNoise<DIM>> noise_ptr = std::make_shared<Additive2ndMomentNoise<DIM>>(cov);
 
     // Init set
     std::vector<HyperRectangle<DIM>> init_sets(1);
-    init_sets[0].lower_bounds(0) = 0.4;
-    init_sets[0].upper_bounds(0) = 0.6;
+    init_sets[0].lower_bounds(0) = 0.3;
+    init_sets[0].upper_bounds(0) = 0.5;
+    init_sets[0].lower_bounds(1) = 0.2;
+    init_sets[0].upper_bounds(1) = 0.3;
 
     // Unsafe set
     std::vector<HyperRectangle<DIM>> unsafe_sets(2);
-    unsafe_sets[0].lower_bounds(0) = 0.8;
-    unsafe_sets[0].upper_bounds(0) = 1.0;
-    unsafe_sets[1].lower_bounds(0) = 0.0;
-    unsafe_sets[1].upper_bounds(0) = 0.2;
+    unsafe_sets[0].lower_bounds(0) = 0.2;
+    unsafe_sets[0].upper_bounds(0) = 0.3;
+    unsafe_sets[0].lower_bounds(1) = 0.6;
+    unsafe_sets[0].upper_bounds(1) = 0.7;
+    unsafe_sets[1].lower_bounds(0) = 0.7;
+    unsafe_sets[1].upper_bounds(0) = 0.8;
+    unsafe_sets[1].lower_bounds(1) = 0.2;
+    unsafe_sets[1].upper_bounds(1) = 0.3;
 
-    // Init set
-    std::vector<HyperRectangle<DIM>> safe_sets(1);
-    safe_sets[0].lower_bounds(0) = 0.2;
-    safe_sets[0].upper_bounds(0) = 0.8;
-    //safe_sets[1].lower_bounds(0) = 0.7;
-    //safe_sets[1].upper_bounds(0) = 1.0;
+    // Safe set
+    std::vector<HyperRectangle<DIM>> safe_sets(7);
+    safe_sets[0].lower_bounds(0) = 0.0;
+    safe_sets[0].upper_bounds(0) = 0.7;
+    safe_sets[0].lower_bounds(1) = 0.0;
+    safe_sets[0].upper_bounds(1) = 0.6;
 
-    bry_deg_t deg = 16;
+    safe_sets[1].lower_bounds(0) = 0.0;
+    safe_sets[1].upper_bounds(0) = 0.2;
+    safe_sets[1].lower_bounds(1) = 0.6;
+    safe_sets[1].upper_bounds(1) = 0.7;
+
+    safe_sets[2].lower_bounds(0) = 0.0;
+    safe_sets[2].upper_bounds(0) = 0.3;
+    safe_sets[2].lower_bounds(1) = 0.7;
+    safe_sets[2].upper_bounds(1) = 1.0;
+
+    safe_sets[3].lower_bounds(0) = 0.3;
+    safe_sets[3].upper_bounds(0) = 0.7;
+    safe_sets[3].lower_bounds(1) = 0.6;
+    safe_sets[3].upper_bounds(1) = 1.0;
+
+    safe_sets[4].lower_bounds(0) = 0.7;
+    safe_sets[4].upper_bounds(0) = 1.0;
+    safe_sets[4].lower_bounds(1) = 0.3;
+    safe_sets[4].upper_bounds(1) = 1.0;
+
+    safe_sets[5].lower_bounds(0) = 0.8;
+    safe_sets[5].upper_bounds(0) = 1.0;
+    safe_sets[5].lower_bounds(1) = 0.0;
+    safe_sets[5].upper_bounds(1) = 0.3;
+
+    safe_sets[6].lower_bounds(0) = 0.7;
+    safe_sets[6].upper_bounds(0) = 0.8;
+    safe_sets[6].lower_bounds(1) = 0.0;
+    safe_sets[6].upper_bounds(1) = 0.2;
+
+    bry_deg_t deg = 9;
     PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, deg);
 
     synthesizer.insertInitialSets(std::move(init_sets));
