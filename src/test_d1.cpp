@@ -32,7 +32,6 @@ int main() {
     Covariance<DIM> cov;
     cov(0) = 0.01;
     std::shared_ptr<Additive2ndMomentNoise<DIM>> noise_ptr = std::make_shared<Additive2ndMomentNoise<DIM>>(cov);
-    DEBUG("noise matrix: \n" << noise_ptr->additiveNoiseMatrix(4));
 
     // Init set
     std::vector<HyperRectangle<DIM>> init_sets(1);

@@ -89,15 +89,20 @@ void BRY::PolyDynamicsSynthesizer<DIM>::initialize() {
     Eigen::MatrixXd F_expec_Gamma = m_dynamics->dynamicsPowerMatrix(m_barrier_deg) * m_noise->additiveNoiseMatrix(m_barrier_deg);
     //DEBUG("F \n" << m_dynamics->dynamicsPowerMatrix(m_barrier_deg));
     //DEBUG("F expec Gamma: \n" << F_expec_Gamma);
-    Eigen::MatrixXd Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(m_dynamics->composedDegree(m_barrier_deg));
+    bry_deg_t p = m_dynamics->composedDegree(m_barrier_deg);
+    Eigen::MatrixXd Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(p);
     //Eigen::VectorXd gamma_coeffs = Phi_inv_p * Eigen::VectorXd::Ones(Phi_inv_p.cols());
     Eigen::VectorXd gamma_coeffs = Eigen::VectorXd::Ones(Phi_p.cols());
     ASSERT(F_expec_Gamma.rows() == Phi_p.cols(), "Dimension mismatch between F and Phi (p)");
 
     for (const HyperRectangle<DIM>& set : this->m_safe_sets) {
+        //Eigen::MatrixXd beta_coeffs = 
+        //    -Phi_p * (F_expec_Gamma - Eigen::MatrixXd::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) 
+        //    * set.transformationMatrix(m_barrier_deg) * Phi_inv_m;
+
         Eigen::MatrixXd beta_coeffs = 
-            -Phi_p * (F_expec_Gamma - Eigen::MatrixXd::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) 
-            * set.transformationMatrix(m_barrier_deg) * Phi_inv_m;
+            -Phi_p * set.transformationMatrix(p) * (F_expec_Gamma - Eigen::MatrixXd::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) * Phi_inv_m;
+
         //DEBUG("Safe set beta coeffs: \n" << beta_coeffs);
         //DEBUG("transformation matrix: \n" << set.transformationMatrix(m_barrier_deg));
         //DEBUG("matrix: \n" << (F_expec_Gamma - Eigen::MatrixXd::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) * set.transformationMatrix(m_barrier_deg));
