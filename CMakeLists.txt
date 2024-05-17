@@ -6,8 +6,10 @@ find_package (Eigen3 3.3.8 REQUIRED NO_MODULE)
 find_package(Threads REQUIRED)
 find_package(ortools REQUIRED)
 
-# TODO: Optionfy this
-set(CMAKE_BUILD_TYPE Debug)
+if(NOT DEFINED CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug)
+endif()
+message("Build type: ${CMAKE_BUILD_TYPE}")
 
 if(NOT DEFINED BRYR_BUILD_YAML)
     option(BRYR_BUILD_YAML "Build the yaml-cpp dependency" ON)

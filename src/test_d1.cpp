@@ -4,6 +4,7 @@
 #include "Synthesis.h"
 
 #include <iostream>
+#include <iomanip>
 
 #include <Eigen/Dense>
 
@@ -19,6 +20,7 @@ int main() {
         }
         std::cout << std::endl;
     };
+
 
     constexpr std::size_t DIM = 1;
     std::shared_ptr<PolynomialDynamics<DIM>> dynamics_ptr = std::make_shared<PolynomialDynamics<1>>(1);    
@@ -50,12 +52,12 @@ int main() {
     //safe_sets[1].lower_bounds(0) = 0.7;
     //safe_sets[1].upper_bounds(0) = 1.0;
 
-    bry_deg_t deg = 16;
+    bry_deg_t deg = 30;
     PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, deg);
 
-    synthesizer.insertInitialSets(std::move(init_sets));
-    synthesizer.insertUnsafeSets(std::move(unsafe_sets));
-    synthesizer.insertSafeSets(std::move(safe_sets));
+    synthesizer.setInitialSets(std::move(init_sets));
+    synthesizer.setUnsafeSets(std::move(unsafe_sets));
+    synthesizer.setSafeSets(std::move(safe_sets));
 
     synthesizer.initialize();
     auto result = synthesizer.synthesize(4);
@@ -67,11 +69,12 @@ int main() {
     auto certificate_power = transform(*result.certificate, b_to_p);
 
     INFO("Barrier: " << certificate_power);
+    INFO("Coefficients:");
     for (std::size_t i = 0; i < certificate_power.tensor().size(); ++i) {
         if (i < certificate_power.tensor().size() - 1) {
-            std::cout << certificate_power.tensor()(i) << ", ";
+            std::cout << std::fixed << std::setprecision(20) << certificate_power.tensor()(i) << ", ";
         } else {
-            std::cout << certificate_power.tensor()(i) << std::endl;
+            std::cout << std::fixed << std::setprecision(20) << certificate_power.tensor()(i) << std::endl;
         }
     }
 

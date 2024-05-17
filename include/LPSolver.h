@@ -33,6 +33,10 @@ class LPSolver {
         /// @param n_monoms Number of monomials in barrier
         LPSolver(const std::string& solver_id, bry_deg_t n_monoms);
 
+        /// @brief Set the constraint for non-negativity over the workspace (B(x) >= 0)
+        /// @param beta_coeffs Coefficient matrix for beta vector
+        void setWorkspaceConstraint(const Eigen::MatrixXd& beta_coeffs);
+
         /// @brief Add constraint for an intial set region (B(x) - eta <= 0)
         /// @param beta_coeffs Coefficient matrix for beta vector
         /// @param eta_coeffs Coefficient vector for eta (number of elements must match rows in `beta_coeffs`)

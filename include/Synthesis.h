@@ -26,10 +26,15 @@ class Synthesizer {
 
     public:
 
-        void insertInitialSets(std::vector<HyperRectangle<DIM>>&& sets);
-        void insertSafeSets(std::vector<HyperRectangle<DIM>>&& sets);
-        void insertUnsafeSets(std::vector<HyperRectangle<DIM>>&& sets);
-    
+        void setInitialSets(const std::vector<HyperRectangle<DIM>>& sets);
+        void setInitialSets(std::vector<HyperRectangle<DIM>>&& sets);
+        void setSafeSets(const std::vector<HyperRectangle<DIM>>& sets);
+        void setSafeSets(std::vector<HyperRectangle<DIM>>&& sets);
+        void setUnsafeSets(const std::vector<HyperRectangle<DIM>>& sets);
+        void setUnsafeSets(std::vector<HyperRectangle<DIM>>&& sets);
+
+        void setWorkspace(const HyperRectangle<DIM>& set);
+
         virtual void initialize() = 0;
         virtual Result synthesize(uint32_t time_horizon) = 0;
 
@@ -37,6 +42,7 @@ class Synthesizer {
         Synthesizer() = default;
 
     protected:
+        HyperRectangle<DIM> m_workspace = HyperRectangle<DIM>();
         std::vector<HyperRectangle<DIM>> m_init_sets;
         std::vector<HyperRectangle<DIM>> m_safe_sets;
         std::vector<HyperRectangle<DIM>> m_unsafe_sets;

@@ -5,7 +5,7 @@
 #include "berry/Options.h"
 
 BRY::LPSolver::LPSolver(const std::string& solver_id, bry_deg_t n_monoms)
-    : m_solver(ort::MPSolver::CreateSolver("SCIP"))
+    : m_solver(ort::MPSolver::CreateSolver(solver_id))
     , m_n_monoms(n_monoms)
 {
     if (!m_solver) {
@@ -18,9 +18,27 @@ BRY::LPSolver::LPSolver(const std::string& solver_id, bry_deg_t n_monoms)
         m_solver->MakeNumVarArray(n_monoms, 0.0, m_inf, "beta", &m_beta);
         m_eta = m_solver->MakeNumVar(0.0, m_inf, "eta");
         m_gamma = m_solver->MakeNumVar(0.0, m_inf, "gamma");
+
+        // Set the solver parameters
+        //m_solver->set_time_limit(100000);
     }
 }
 
+void BRY::LPSolver::setWorkspaceConstraint(const Eigen::MatrixXd& beta_coeffs) {
+#ifdef BRY_ENABLE_BOUNDS_CHECK
+    ASSERT(beta_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
+#endif
+    for (bry_idx_t i = 0; i < beta_coeffs.rows(); ++i) {
+        ort::MPConstraint* row_constraint = m_solver->MakeRowConstraint(0.0, m_inf, "");
+        for (bry_idx_t j = 0; j < beta_coeffs.cols(); ++j) {
+            row_constraint->SetCoefficient(m_beta[j], beta_coeffs(i, j));
+        }
+        // Neither eta nor gamma appear in this constraint
+        row_constraint->SetCoefficient(m_eta, 0.0);
+        row_constraint->SetCoefficient(m_gamma, 0.0);
+    }
+    INFO("[Workspace] Added " << beta_coeffs.rows() << " constraints");
+}
 
 void BRY::LPSolver::addInitialSetConstraint(const Eigen::MatrixXd& beta_coeffs, const Eigen::VectorXd& eta_coeffs) {
     bry_idx_t rows = eta_coeffs.size();
