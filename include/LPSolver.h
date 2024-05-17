@@ -52,6 +52,13 @@ class LPSolver {
         /// @param gamma_coeffs Coefficient vector for gamma (number of elements must match rows in `beta_coeffs`)
         void addSafeSetConstraint(const Eigen::MatrixXd& beta_coeffs, const Eigen::VectorXd& gamma_coeffs);
 
+        /// @brief Give a hint to the optimizer using the trivial barrier (B(x) = 1, eta = 1, gamma = 0)
+        void setTrivialBarrierHint();
+
+        /// @brief Set a time limit for the solver
+        /// @param time_limit_ms Time limit in milliseconds
+        void setTimeLimit(int64_t time_limit_ms);
+
         /* TODO */
         //void enforceBoundaryConstraints(const Eigen::MatrixXd& constraint);
 

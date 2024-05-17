@@ -40,6 +40,10 @@ int main() {
     cov(1, 1) = 0.01;
     std::shared_ptr<Additive2ndMomentNoise<DIM>> noise_ptr = std::make_shared<Additive2ndMomentNoise<DIM>>(cov);
 
+    HyperRectangle<DIM> workspace;
+    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-0.1, -0.1);
+    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(1.0, 1.0);
+
     // Init set
     std::vector<HyperRectangle<DIM>> init_sets(1);
     init_sets[0].lower_bounds(0) = 0.3;
@@ -98,6 +102,7 @@ int main() {
     bry_deg_t deg = 10;
     PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, deg);
 
+    synthesizer.setWorkspace(workspace);
     synthesizer.setInitialSets(std::move(init_sets));
     synthesizer.setUnsafeSets(std::move(unsafe_sets));
     synthesizer.setSafeSets(std::move(safe_sets));

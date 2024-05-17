@@ -45,10 +45,9 @@ void BRY::Synthesizer<DIM>::setWorkspace(const HyperRectangle<DIM>& set) {
 /* PolyDynamicsSynthesizer */
 
 template <std::size_t DIM>
-BRY::PolyDynamicsSynthesizer<DIM>::PolyDynamicsSynthesizer(const std::shared_ptr<PolynomialDynamics<DIM>>& dynamics, const std::shared_ptr<Additive2ndMomentNoise<DIM>>& noise, bry_deg_t barrier_deg)
+BRY::PolyDynamicsSynthesizer<DIM>::PolyDynamicsSynthesizer(const std::shared_ptr<PolynomialDynamics<DIM>>& dynamics, const std::shared_ptr<Additive2ndMomentNoise<DIM>>& noise, bry_deg_t barrier_deg, const std::string& solver_id)
     : m_dynamics(dynamics)
-    //, m_solver(new LPSolver("SCIP", pow(barrier_deg + 1, DIM)))
-    , m_solver(new LPSolver("PDLP", pow(barrier_deg + 1, DIM)))
+    , m_solver(new LPSolver(solver_id, pow(barrier_deg + 1, DIM)))
     , m_barrier_deg(barrier_deg)
     , m_noise(noise)
 {}
@@ -90,25 +89,29 @@ void BRY::PolyDynamicsSynthesizer<DIM>::initialize() {
     Eigen::MatrixXd F_expec_Gamma = m_dynamics->dynamicsPowerMatrix(m_barrier_deg) * m_noise->additiveNoiseMatrix(m_barrier_deg);
     //DEBUG("F \n" << m_dynamics->dynamicsPowerMatrix(m_barrier_deg));
     //DEBUG("F expec Gamma: \n" << F_expec_Gamma);
-    Eigen::MatrixXd Phi_inv_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(m_dynamics->composedDegree(m_barrier_deg));
+    Eigen::MatrixXd Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(m_dynamics->composedDegree(m_barrier_deg));
     //Eigen::VectorXd gamma_coeffs = Phi_inv_p * Eigen::VectorXd::Ones(Phi_inv_p.cols());
-    Eigen::VectorXd gamma_coeffs = Eigen::VectorXd::Ones(Phi_inv_p.cols());
-    ASSERT(F_expec_Gamma.rows() == Phi_inv_p.cols(), "Dimension mismatch between F and Phi inv (p)");
+    Eigen::VectorXd gamma_coeffs = Eigen::VectorXd::Ones(Phi_p.cols());
+    ASSERT(F_expec_Gamma.rows() == Phi_p.cols(), "Dimension mismatch between F and Phi (p)");
 
     for (const HyperRectangle<DIM>& set : this->m_safe_sets) {
-        DEBUG("b4 comp");
         Eigen::MatrixXd beta_coeffs = 
-            -Phi_inv_p * (F_expec_Gamma - Eigen::MatrixXd::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) 
+            -Phi_p * (F_expec_Gamma - Eigen::MatrixXd::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) 
             * set.transformationMatrix(m_barrier_deg) * Phi_inv_m;
-        DEBUG("af comp");
         //DEBUG("Safe set beta coeffs: \n" << beta_coeffs);
         //DEBUG("transformation matrix: \n" << set.transformationMatrix(m_barrier_deg));
         //DEBUG("matrix: \n" << (F_expec_Gamma - Eigen::MatrixXd::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) * set.transformationMatrix(m_barrier_deg));
-        DEBUG("b4 add constraint");
         m_solver->addSafeSetConstraint(beta_coeffs, gamma_coeffs);
-        DEBUG("af add constraint");
     }
+    
+    m_solver->setTrivialBarrierHint();
+
     this->m_initialized = true;
+}
+
+template <std::size_t DIM>
+void BRY::PolyDynamicsSynthesizer<DIM>::setTimeLimit(int64_t time_limit_ms) {
+    m_solver->setTimeLimit(time_limit_ms);
 }
 
 template <std::size_t DIM>
@@ -123,6 +126,8 @@ BRY::Synthesizer<DIM>::Result BRY::PolyDynamicsSynthesizer<DIM>::synthesize(uint
     result.p_safe = solver_result.p_safe;
     result.eta = solver_result.eta;
     result.gamma = solver_result.gamma;
+
+    DEBUG("min beta: " << solver_result.beta_values.minCoeff());
 
     result.certificate.reset(new Polynomial<DIM, Basis::Bernstein>(solver_result.beta_values));
     return result;

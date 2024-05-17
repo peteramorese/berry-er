@@ -20,7 +20,7 @@ BRY::LPSolver::LPSolver(const std::string& solver_id, bry_deg_t n_monoms)
         m_gamma = m_solver->MakeNumVar(0.0, m_inf, "gamma");
 
         // Set the solver parameters
-        //m_solver->set_time_limit(100000);
+        //m_solver->set_time_limit(10000);
     }
 }
 
@@ -93,6 +93,21 @@ void BRY::LPSolver::addSafeSetConstraint(const Eigen::MatrixXd& beta_coeffs, con
         row_constraint->SetCoefficient(m_gamma, gamma_coeffs(i));
     }
     INFO("[Safe set] Added " << rows << " constraints");
+}
+
+void BRY::LPSolver::setTrivialBarrierHint() {
+    std::vector<std::pair<const ort::MPVariable*, double>> hint;
+    hint.reserve(m_n_monoms + 2);
+    for (const ort::MPVariable* beta_i : m_beta) {
+        hint.push_back({beta_i, 1.0});
+    }
+    hint.push_back({m_eta, 1.0});
+    hint.push_back({m_gamma, 0.0});
+    m_solver->SetHint(hint);
+}
+
+void BRY::LPSolver::setTimeLimit(int64_t time_limit_ms) {
+    m_solver->set_time_limit(time_limit_ms);
 }
 
 BRY::LPSolver::Result BRY::LPSolver::solve(uint32_t time_horizon) {

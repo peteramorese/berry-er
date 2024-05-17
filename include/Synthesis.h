@@ -54,9 +54,15 @@ class PolyDynamicsSynthesizer : public Synthesizer<DIM> {
     public:
         PolyDynamicsSynthesizer(const std::shared_ptr<PolynomialDynamics<DIM>>& dynamics, 
                                 const std::shared_ptr<Additive2ndMomentNoise<DIM>>& noise, 
-                                bry_deg_t barrier_deg);
+                                bry_deg_t barrier_deg,
+                                const std::string& solver_id = "SCIP");
 
         virtual void initialize() override;
+
+        /// @brief Set a time limit for the solver
+        /// @param time_limit_ms Time limit in milliseconds
+        void setTimeLimit(int64_t time_limit_ms);
+
         virtual Synthesizer<DIM>::Result synthesize(uint32_t time_horizon) override;
 
     private:
