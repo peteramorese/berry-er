@@ -21,7 +21,7 @@ void writeMatrixToFile(const Eigen::MatrixXd& matrix, const std::string& filenam
         // Write matrix data
         for (int i = 0; i < matrix.rows(); ++i) {
             for (int j = 0; j < matrix.cols(); ++j) {
-                file << std::fixed << std::setprecision(20) << matrix(i, j);
+                file << std::fixed << std::setprecision(40) << matrix(i, j);
                 if (j < matrix.cols() - 1) file << " ";
             }
             file << std::endl;
@@ -115,15 +115,15 @@ int main(int argc, char** argv) {
     std::vector<HyperRectangle<DIM>> init_sets(1);
     init_sets[0].lower_bounds(0) = -0.8;
     init_sets[0].upper_bounds(0) = -0.6;
-    init_sets[0].lower_bounds(1) = -0.2;
-    init_sets[0].upper_bounds(1) = 0.0;
+    init_sets[0].lower_bounds(1) = 0.0;
+    init_sets[0].upper_bounds(1) = 0.2;
     DEBUG("Init set:");
     printSetBounds(init_sets[0]);
     NEW_LINE;
 
     DEBUG("Unsafe sets:");
     // Unsafe set
-    std::vector<HyperRectangle<DIM>> unsafe_sets(4);
+    std::vector<HyperRectangle<DIM>> unsafe_sets(6);
     // Boundary left
     unsafe_sets[0].lower_bounds(0) = -1.0 - boundary_width(0);
     unsafe_sets[0].upper_bounds(0) = -1.0;
@@ -149,47 +149,49 @@ int main(int argc, char** argv) {
     unsafe_sets[3].upper_bounds(1) = -0.5;
     printSetBounds(unsafe_sets[3]);
     // Non convex unsafe regions
-    //unsafe_sets[4].lower_bounds(0) = -0.57;
-    //unsafe_sets[4].upper_bounds(0) = -0.53;
-    //unsafe_sets[4].lower_bounds(1) = -0.17;
-    //unsafe_sets[4].upper_bounds(1) = -0.13;
-    //unsafe_sets[5].lower_bounds(0) = -0.57;
-    //unsafe_sets[5].upper_bounds(0) = -0.53;
-    //unsafe_sets[5].lower_bounds(1) = 0.28;
-    //unsafe_sets[5].upper_bounds(1) = 0.32;
+    unsafe_sets[4].lower_bounds(0) = -0.57;
+    unsafe_sets[4].upper_bounds(0) = -0.53;
+    unsafe_sets[4].lower_bounds(1) = -0.17;
+    unsafe_sets[4].upper_bounds(1) = -0.13;
+    printSetBounds(unsafe_sets[4]);
+    unsafe_sets[5].lower_bounds(0) = -0.57;
+    unsafe_sets[5].upper_bounds(0) = -0.53;
+    unsafe_sets[5].lower_bounds(1) = 0.28;
+    unsafe_sets[5].upper_bounds(1) = 0.32;
+    printSetBounds(unsafe_sets[5]);
 
     // Safe set
-    std::vector<HyperRectangle<DIM>> safe_sets(1);
-    safe_sets[0].lower_bounds(0) = -1.0;
-    safe_sets[0].upper_bounds(0) = 0.5;
-    safe_sets[0].lower_bounds(1) = -0.5;
-    safe_sets[0].upper_bounds(1) = 0.5;
-
-    //std::vector<HyperRectangle<DIM>> safe_sets(5);
+    //std::vector<HyperRectangle<DIM>> safe_sets(1);
     //safe_sets[0].lower_bounds(0) = -1.0;
-    //safe_sets[0].upper_bounds(0) = -0.57;
+    //safe_sets[0].upper_bounds(0) = 0.5;
     //safe_sets[0].lower_bounds(1) = -0.5;
     //safe_sets[0].upper_bounds(1) = 0.5;
 
-    //safe_sets[1].lower_bounds(0) = -0.57;
-    //safe_sets[1].upper_bounds(0) = -0.53;
-    //safe_sets[1].lower_bounds(1) = -0.5;
-    //safe_sets[1].upper_bounds(1) = -0.17;
+    std::vector<HyperRectangle<DIM>> safe_sets(5);
+    safe_sets[0].lower_bounds(0) = -1.0;
+    safe_sets[0].upper_bounds(0) = -0.57;
+    safe_sets[0].lower_bounds(1) = -0.5;
+    safe_sets[0].upper_bounds(1) = 0.5;
 
-    //safe_sets[2].lower_bounds(0) = -0.57;
-    //safe_sets[2].upper_bounds(0) = -0.53;
-    //safe_sets[2].lower_bounds(1) = -0.13;
-    //safe_sets[2].upper_bounds(1) = 0.28;
+    safe_sets[1].lower_bounds(0) = -0.57;
+    safe_sets[1].upper_bounds(0) = -0.53;
+    safe_sets[1].lower_bounds(1) = -0.5;
+    safe_sets[1].upper_bounds(1) = -0.17;
 
-    //safe_sets[3].lower_bounds(0) = -0.57;
-    //safe_sets[3].upper_bounds(0) = -0.53;
-    //safe_sets[3].lower_bounds(1) = 0.32;
-    //safe_sets[3].upper_bounds(1) = 0.5;
+    safe_sets[2].lower_bounds(0) = -0.57;
+    safe_sets[2].upper_bounds(0) = -0.53;
+    safe_sets[2].lower_bounds(1) = -0.13;
+    safe_sets[2].upper_bounds(1) = 0.28;
 
-    //safe_sets[4].lower_bounds(0) = -0.53;
-    //safe_sets[4].upper_bounds(0) = 0.5;
-    //safe_sets[4].lower_bounds(1) = -0.5;
-    //safe_sets[4].upper_bounds(1) = 0.5;
+    safe_sets[3].lower_bounds(0) = -0.57;
+    safe_sets[3].upper_bounds(0) = -0.53;
+    safe_sets[3].lower_bounds(1) = 0.32;
+    safe_sets[3].upper_bounds(1) = 0.5;
+
+    safe_sets[4].lower_bounds(0) = -0.53;
+    safe_sets[4].upper_bounds(0) = 0.5;
+    safe_sets[4].lower_bounds(1) = -0.5;
+    safe_sets[4].upper_bounds(1) = 0.5;
 #endif
 
     PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, barrier_deg.get(), solver_id.get());
@@ -220,18 +222,20 @@ int main(int argc, char** argv) {
         auto certificate_power = transform(*result.certificate, b_to_p);
 
         INFO("Barrier: " << certificate_power);
+        NEW_LINE;
+
+        INFO("Coefficients:");
+        for (std::size_t i = 0; i < certificate_power.tensor().size(); ++i) {
+            if (i < certificate_power.tensor().size() - 1) {
+                std::cout << std::fixed << std::setprecision(20) << certificate_power.tensor()(i) << ", ";
+            } else {
+                std::cout << std::fixed << std::setprecision(20) << certificate_power.tensor()(i) << std::endl;
+            }
+        }
+
     }
 
 
-
-    //INFO("Coefficients:");
-    //for (std::size_t i = 0; i < certificate_power.tensor().size(); ++i) {
-    //    if (i < certificate_power.tensor().size() - 1) {
-    //        std::cout << std::fixed << std::setprecision(20) << certificate_power.tensor()(i) << ", ";
-    //    } else {
-    //        std::cout << std::fixed << std::setprecision(20) << certificate_power.tensor()(i) << std::endl;
-    //    }
-    //}
 
 
     //Eigen::MatrixXd phi_inv = BernsteinBasisTransform<DIM>::bernToPwrMatrix(2);

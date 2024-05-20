@@ -62,7 +62,7 @@ std::pair<Eigen::MatrixXd, Eigen::VectorXd> BRY::PolyDynamicsSynthesizer<DIM>::g
     Eigen::MatrixXd ws_beta_coeffs = Phi_m * this->m_workspace.transformationMatrix(m_barrier_deg) * Phi_inv_m;
     Eigen::MatrixXd ws_coeffs(ws_beta_coeffs.rows(), n_cols);
     //           beta            eta                                           gamma
-    ws_coeffs << ws_beta_coeffs, Eigen::VectorXd::Zero(ws_beta_coeffs.cols()), Eigen::VectorXd::Zero(ws_beta_coeffs.cols());
+    ws_coeffs << ws_beta_coeffs, Eigen::VectorXd::Zero(ws_beta_coeffs.rows()), Eigen::VectorXd::Zero(ws_beta_coeffs.rows());
     Eigen::VectorXd ws_lower_bound = Eigen::VectorXd::Zero(ws_beta_coeffs.cols());
 
     // Initial sets
@@ -76,7 +76,7 @@ std::pair<Eigen::MatrixXd, Eigen::VectorXd> BRY::PolyDynamicsSynthesizer<DIM>::g
         //DEBUG("init beta coeffs \n" << beta_coeffs);
         Eigen::MatrixXd coeffs(beta_coeffs.rows(), n_cols);
         //        beta         eta                                        gamma
-        coeffs << beta_coeffs, Eigen::VectorXd::Ones(beta_coeffs.cols()), Eigen::VectorXd::Zero(beta_coeffs.cols());
+        coeffs << beta_coeffs, Eigen::VectorXd::Ones(beta_coeffs.rows()), Eigen::VectorXd::Zero(beta_coeffs.rows());
         init_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
     }
 
@@ -91,7 +91,7 @@ std::pair<Eigen::MatrixXd, Eigen::VectorXd> BRY::PolyDynamicsSynthesizer<DIM>::g
         //DEBUG("unsafe beta coeffs \n" << beta_coeffs);
         Eigen::MatrixXd coeffs(beta_coeffs.rows(), n_cols);
         //        beta         eta                                        gamma
-        coeffs << beta_coeffs, Eigen::VectorXd::Zero(beta_coeffs.cols()), Eigen::VectorXd::Zero(beta_coeffs.cols());
+        coeffs << beta_coeffs, Eigen::VectorXd::Zero(beta_coeffs.rows()), Eigen::VectorXd::Zero(beta_coeffs.rows());
         unsafe_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
     }
 
@@ -114,7 +114,7 @@ std::pair<Eigen::MatrixXd, Eigen::VectorXd> BRY::PolyDynamicsSynthesizer<DIM>::g
         //DEBUG("safe beta coeffs \n" << beta_coeffs);
         Eigen::MatrixXd coeffs(beta_coeffs.rows(), n_cols);
         //        beta         eta                                        gamma
-        coeffs << beta_coeffs, Eigen::VectorXd::Zero(beta_coeffs.cols()), Eigen::VectorXd::Ones(beta_coeffs.cols());
+        coeffs << beta_coeffs, Eigen::VectorXd::Zero(beta_coeffs.rows()), Eigen::VectorXd::Ones(beta_coeffs.rows());
         safe_coeffs.block(Phi_p.rows() * i++, 0, Phi_p.rows(), n_cols) = coeffs;
     }
 
@@ -207,7 +207,7 @@ BRY::Synthesizer<DIM>::Result BRY::PolyDynamicsSynthesizer<DIM>::synthesize(uint
     result.gamma = solver_result.gamma;
 
     //DEBUG("min beta: " << solver_result.beta_values.minCoeff());
-    DEBUG("beta values: " << solver_result.beta_values.transpose());
+    //DEBUG("beta values: " << solver_result.beta_values.transpose());
 
     result.certificate.reset(new Polynomial<DIM, Basis::Bernstein>(solver_result.beta_values));
     return result;
