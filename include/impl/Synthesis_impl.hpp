@@ -53,6 +53,80 @@ BRY::PolyDynamicsSynthesizer<DIM>::PolyDynamicsSynthesizer(const std::shared_ptr
 {}
 
 template <std::size_t DIM>
+std::pair<Eigen::MatrixXd, Eigen::VectorXd> BRY::PolyDynamicsSynthesizer<DIM>::getConstraintMatrices() const {
+    Eigen::MatrixXd Phi_m = BernsteinBasisTransform<DIM>::pwrToBernMatrix(m_barrier_deg);
+    Eigen::MatrixXd Phi_inv_m = BernsteinBasisTransform<DIM>::bernToPwrMatrix(m_barrier_deg);
+
+    // Workspace
+    bry_deg_t n_cols = Phi_m.cols() + 2;
+    Eigen::MatrixXd ws_beta_coeffs = Phi_m * this->m_workspace.transformationMatrix(m_barrier_deg) * Phi_inv_m;
+    Eigen::MatrixXd ws_coeffs(ws_beta_coeffs.rows(), n_cols);
+    //           beta            eta                                           gamma
+    ws_coeffs << ws_beta_coeffs, Eigen::VectorXd::Zero(ws_beta_coeffs.cols()), Eigen::VectorXd::Zero(ws_beta_coeffs.cols());
+    Eigen::VectorXd ws_lower_bound = Eigen::VectorXd::Zero(ws_beta_coeffs.cols());
+
+    // Initial sets
+    if (this->m_init_sets.empty())
+        WARN("No initial sets were provided");
+    Eigen::MatrixXd init_coeffs(this->m_init_sets.size() * Phi_m.rows(), n_cols);
+    Eigen::VectorXd init_lower_bound = Eigen::VectorXd::Zero(init_coeffs.rows());
+    bry_idx_t i = 0;
+    for (const HyperRectangle<DIM>& set : this->m_init_sets) {
+        Eigen::MatrixXd beta_coeffs = -Phi_m * set.transformationMatrix(m_barrier_deg) * Phi_inv_m;
+        //DEBUG("init beta coeffs \n" << beta_coeffs);
+        Eigen::MatrixXd coeffs(beta_coeffs.rows(), n_cols);
+        //        beta         eta                                        gamma
+        coeffs << beta_coeffs, Eigen::VectorXd::Ones(beta_coeffs.cols()), Eigen::VectorXd::Zero(beta_coeffs.cols());
+        init_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
+    }
+
+    // Unsafe sets
+    if (this->m_unsafe_sets.empty())
+        WARN("No unsafe sets were provided");
+    Eigen::MatrixXd unsafe_coeffs(this->m_unsafe_sets.size() * Phi_m.rows(), n_cols);
+    Eigen::VectorXd unsafe_lower_bound = Eigen::VectorXd::Ones(unsafe_coeffs.rows());
+    i = 0;
+    for (const HyperRectangle<DIM>& set : this->m_unsafe_sets) {
+        Eigen::MatrixXd beta_coeffs = Phi_m * set.transformationMatrix(m_barrier_deg) * Phi_inv_m;
+        //DEBUG("unsafe beta coeffs \n" << beta_coeffs);
+        Eigen::MatrixXd coeffs(beta_coeffs.rows(), n_cols);
+        //        beta         eta                                        gamma
+        coeffs << beta_coeffs, Eigen::VectorXd::Zero(beta_coeffs.cols()), Eigen::VectorXd::Zero(beta_coeffs.cols());
+        unsafe_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
+    }
+
+    // Safe sets
+    if (this->m_safe_sets.empty())
+        WARN("No safe sets were provided");
+    Eigen::MatrixXd F_expec_Gamma = m_dynamics->dynamicsPowerMatrix(m_barrier_deg) * m_noise->additiveNoiseMatrix(m_barrier_deg);
+    bry_deg_t p = m_dynamics->composedDegree(m_barrier_deg);
+    Eigen::MatrixXd Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(p);
+    Eigen::VectorXd gamma_coeffs = Eigen::VectorXd::Ones(Phi_p.cols());
+    ASSERT(F_expec_Gamma.rows() == Phi_p.cols(), "Dimension mismatch between F and Phi (p)");
+
+    Eigen::MatrixXd safe_coeffs(this->m_safe_sets.size() * Phi_p.rows(), n_cols);
+    Eigen::VectorXd safe_lower_bound = Eigen::VectorXd::Zero(safe_coeffs.rows());
+    i = 0;
+    for (const HyperRectangle<DIM>& set : this->m_safe_sets) {
+        Eigen::MatrixXd beta_coeffs = 
+            -Phi_p * set.transformationMatrix(p) * (F_expec_Gamma - Eigen::MatrixXd::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) * Phi_inv_m;
+        
+        //DEBUG("safe beta coeffs \n" << beta_coeffs);
+        Eigen::MatrixXd coeffs(beta_coeffs.rows(), n_cols);
+        //        beta         eta                                        gamma
+        coeffs << beta_coeffs, Eigen::VectorXd::Zero(beta_coeffs.cols()), Eigen::VectorXd::Ones(beta_coeffs.cols());
+        safe_coeffs.block(Phi_p.rows() * i++, 0, Phi_p.rows(), n_cols) = coeffs;
+    }
+
+    Eigen::MatrixXd A(ws_coeffs.rows() + init_coeffs.rows() + unsafe_coeffs.rows() + safe_coeffs.rows(), n_cols);
+    A << ws_coeffs, init_coeffs, unsafe_coeffs, safe_coeffs;
+
+    Eigen::VectorXd b(ws_lower_bound.size() + init_lower_bound.size() + unsafe_lower_bound.size() + safe_lower_bound.size());
+    b << ws_lower_bound, init_lower_bound, unsafe_lower_bound, safe_lower_bound;
+    return std::make_pair(std::move(A), std::move(b));
+}
+
+template <std::size_t DIM>
 void BRY::PolyDynamicsSynthesizer<DIM>::initialize() {
     Eigen::MatrixXd Phi_m = BernsteinBasisTransform<DIM>::pwrToBernMatrix(m_barrier_deg);
     Eigen::MatrixXd Phi_inv_m = BernsteinBasisTransform<DIM>::bernToPwrMatrix(m_barrier_deg);
@@ -80,7 +154,7 @@ void BRY::PolyDynamicsSynthesizer<DIM>::initialize() {
     Eigen::VectorXd lower_bound = Eigen::VectorXd::Ones(Phi_m.cols());
     for (const HyperRectangle<DIM>& set : this->m_unsafe_sets) {
         Eigen::MatrixXd beta_coeffs = Phi_m * set.transformationMatrix(m_barrier_deg) * Phi_inv_m;
-        m_solver->addUnsafeSetConstraint(beta_coeffs, eta_coeffs);
+        m_solver->addUnsafeSetConstraint(beta_coeffs, lower_bound);
     }
 
     // Safe sets
@@ -132,7 +206,8 @@ BRY::Synthesizer<DIM>::Result BRY::PolyDynamicsSynthesizer<DIM>::synthesize(uint
     result.eta = solver_result.eta;
     result.gamma = solver_result.gamma;
 
-    DEBUG("min beta: " << solver_result.beta_values.minCoeff());
+    //DEBUG("min beta: " << solver_result.beta_values.minCoeff());
+    DEBUG("beta values: " << solver_result.beta_values.transpose());
 
     result.certificate.reset(new Polynomial<DIM, Basis::Bernstein>(solver_result.beta_values));
     return result;

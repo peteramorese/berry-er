@@ -57,11 +57,15 @@ class PolyDynamicsSynthesizer : public Synthesizer<DIM> {
                                 bry_deg_t barrier_deg,
                                 const std::string& solver_id = "SCIP");
 
-        virtual void initialize() override;
+        /// @brief Get the linear program matrices
+        /// @return Pair: {A, b} where Ax >= b
+        std::pair<Eigen::MatrixXd, Eigen::VectorXd> getConstraintMatrices() const;
 
         /// @brief Set a time limit for the solver
         /// @param time_limit_ms Time limit in milliseconds
         void setTimeLimit(int64_t time_limit_ms);
+
+        virtual void initialize() override;
 
         virtual Synthesizer<DIM>::Result synthesize(uint32_t time_horizon) override;
 

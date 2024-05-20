@@ -4,6 +4,8 @@
 
 #include "berry/Options.h"
 
+#include <ortools/linear_solver/linear_solver.pb.h>
+
 BRY::LPSolver::LPSolver(const std::string& solver_id, bry_deg_t n_monoms)
     : m_solver(ort::MPSolver::CreateSolver(solver_id))
     , m_n_monoms(n_monoms)
@@ -21,6 +23,20 @@ BRY::LPSolver::LPSolver(const std::string& solver_id, bry_deg_t n_monoms)
 
         // Set the solver parameters
         //m_solver->set_time_limit(10000);
+
+        //m_solver->SetSolverSpecificParametersAsString(
+        //R"( 
+        //termination_criteria: { 
+        //    simple_optimality_criteria: { 
+        //        eps_optimal_absolute: 1e-4 
+        //        eps_optimal_relative: 1e-4 
+        //    } 
+        //}
+        //num_threads: 5
+        //num_shards: 5
+        //verbosity_level: 1
+        //)");
+
     }
 }
 

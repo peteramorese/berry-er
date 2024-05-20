@@ -21,7 +21,6 @@ int main() {
         std::cout << std::endl;
     };
 
-
     constexpr std::size_t DIM = 1;
     std::shared_ptr<PolynomialDynamics<DIM>> dynamics_ptr = std::make_shared<PolynomialDynamics<1>>(1);    
     PolynomialDynamics<DIM>& dynamics = *dynamics_ptr;
@@ -52,7 +51,7 @@ int main() {
     //safe_sets[1].lower_bounds(0) = 0.7;
     //safe_sets[1].upper_bounds(0) = 1.0;
 
-    bry_deg_t deg = 30;
+    bry_deg_t deg = 10;
     PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, deg);
 
     synthesizer.setInitialSets(std::move(init_sets));
@@ -60,7 +59,7 @@ int main() {
     synthesizer.setSafeSets(std::move(safe_sets));
 
     synthesizer.initialize();
-    auto result = synthesizer.synthesize(4);
+    auto result = synthesizer.synthesize(5);
     
     INFO("Probability of safety: " << result.p_safe);
     INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
