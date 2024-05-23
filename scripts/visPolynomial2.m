@@ -1,5 +1,6 @@
 function visPolynomial2(coeffs, ws_bounds)
-    [x, y] = meshgrid(linspace(ws_bounds(1), ws_bounds(2), 100), linspace(ws_bounds(3), ws_bounds(4), 100));
+    N = 100;
+    [x, y] = meshgrid(linspace(ws_bounds(1), ws_bounds(2), N), linspace(ws_bounds(3), ws_bounds(4), N));
 
     deg = sqrt(length(coeffs));
     coeffs = reshape(coeffs, deg, deg);
@@ -28,4 +29,5 @@ function z = polyval2(coeffs, x, y, cap)
         end
     end
     z = min(z, cap);
+    fprintf("Min grid value: %.5f\n", min(z,[],"all"));
 end

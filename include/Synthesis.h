@@ -11,69 +11,62 @@
 namespace BRY {
 
 template <std::size_t DIM>
-class Synthesizer {
-    public:
-        struct Result {
-            /// @brief Probability of safety
-            bry_float_t p_safe;
-
-            /// @brief eta (init set constraint) and gamma (expected increase constraint)
-            bry_float_t eta, gamma;
-
-            /// @brief Bernstein polynomial barrier certificate
-            std::unique_ptr<Polynomial<DIM, Basis::Bernstein>> certificate;
-        };
-
-    public:
-
-        void setInitialSets(const std::vector<HyperRectangle<DIM>>& sets);
-        void setInitialSets(std::vector<HyperRectangle<DIM>>&& sets);
-        void setSafeSets(const std::vector<HyperRectangle<DIM>>& sets);
-        void setSafeSets(std::vector<HyperRectangle<DIM>>&& sets);
-        void setUnsafeSets(const std::vector<HyperRectangle<DIM>>& sets);
-        void setUnsafeSets(std::vector<HyperRectangle<DIM>>&& sets);
-
-        void setWorkspace(const HyperRectangle<DIM>& set);
-
-        virtual void initialize() = 0;
-        virtual Result synthesize(uint32_t time_horizon) = 0;
-
-    protected:
-        Synthesizer() = default;
-
-    protected:
-        HyperRectangle<DIM> m_workspace = HyperRectangle<DIM>();
-        std::vector<HyperRectangle<DIM>> m_init_sets;
-        std::vector<HyperRectangle<DIM>> m_safe_sets;
-        std::vector<HyperRectangle<DIM>> m_unsafe_sets;
-        bool m_initialized = false;
+struct SynthesisProblem {
+    HyperRectangle<DIM> workspace = HyperRectangle<DIM>();
+    std::vector<HyperRectangle<DIM>> init_sets;
+    std::vector<HyperRectangle<DIM>> safe_sets;
+    std::vector<HyperRectangle<DIM>> unsafe_sets;
+    uint32_t time_horizon;
 };
 
 template <std::size_t DIM>
-class PolyDynamicsSynthesizer : public Synthesizer<DIM> {
+struct SynthesisSolution {
+    bool success = false;
+
+    /// @brief Probability of safety
+    bry_float_t p_safe = 0.0;
+
+    /// @brief eta (init set constraint) and gamma (expected increase constraint)
+    bry_float_t eta = 0.0; 
+    bry_float_t gamma = 0.0;
+
+    /// @brief Bernstein polynomial barrier certificate
+    std::unique_ptr<Polynomial<DIM, Basis::Bernstein>> certificate = nullptr;
+};
+
+template <std::size_t DIM>
+class PolyDynamicsSynthesizer {
     public:
         PolyDynamicsSynthesizer(const std::shared_ptr<PolynomialDynamics<DIM>>& dynamics, 
                                 const std::shared_ptr<Additive2ndMomentNoise<DIM>>& noise, 
                                 bry_deg_t barrier_deg,
                                 const std::string& solver_id = "SCIP");
 
+        void setProblem(const std::shared_ptr<SynthesisProblem<DIM>>& problem);
+
         /// @brief Get the linear program matrices
         /// @return Pair: {A, b} where Ax >= b
-        std::pair<Eigen::MatrixXd, Eigen::VectorXd> getConstraintMatrices() const;
+        std::pair<Eigen::MatrixXd, Eigen::VectorXd> getConstraintMatrices(bry_deg_t degree_increase = 0) const;
 
         /// @brief Set a time limit for the solver
         /// @param time_limit_ms Time limit in milliseconds
         void setTimeLimit(int64_t time_limit_ms);
 
-        virtual void initialize() override;
+        /// @brief Initialize the synthesizer
+        /// @param degree_increase Decrease the conservativeness by increasing the number constraints
+        void initialize(bry_deg_t degree_increase = 0);
 
-        virtual Synthesizer<DIM>::Result synthesize(uint32_t time_horizon) override;
+        SynthesisSolution<DIM> synthesize();
 
     private:
         std::shared_ptr<PolynomialDynamics<DIM>> m_dynamics;
         std::shared_ptr<Additive2ndMomentNoise<DIM>> m_noise;
         std::unique_ptr<LPSolver> m_solver;
         bry_deg_t m_barrier_deg;
+
+        bool m_initialized = false;
+
+        std::shared_ptr<SynthesisProblem<DIM>> m_problem;
 };
 
 }

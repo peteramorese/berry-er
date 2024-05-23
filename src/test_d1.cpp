@@ -26,40 +26,43 @@ int main() {
     PolynomialDynamics<DIM>& dynamics = *dynamics_ptr;
     dynamics[0].coeff(0) = 0.0;
     dynamics[0].coeff(1) = 0.90;
-    //dynamics[0].coeff(2) = 2.2;
 
     Covariance<DIM> cov;
     cov(0) = 0.01;
     std::shared_ptr<Additive2ndMomentNoise<DIM>> noise_ptr = std::make_shared<Additive2ndMomentNoise<DIM>>(cov);
 
-    // Init set
-    std::vector<HyperRectangle<DIM>> init_sets(1);
-    init_sets[0].lower_bounds(0) = 0.4;
-    init_sets[0].upper_bounds(0) = 0.6;
-
-    // Unsafe set
-    std::vector<HyperRectangle<DIM>> unsafe_sets(2);
-    unsafe_sets[0].lower_bounds(0) = 0.8;
-    unsafe_sets[0].upper_bounds(0) = 1.0;
-    unsafe_sets[1].lower_bounds(0) = 0.0;
-    unsafe_sets[1].upper_bounds(0) = 0.2;
+    std::shared_ptr<SynthesisProblem<DIM>> prob(new SynthesisProblem<DIM>());
 
     // Init set
-    std::vector<HyperRectangle<DIM>> safe_sets(1);
-    safe_sets[0].lower_bounds(0) = 0.2;
-    safe_sets[0].upper_bounds(0) = 0.8;
-    //safe_sets[1].lower_bounds(0) = 0.7;
-    //safe_sets[1].upper_bounds(0) = 1.0;
+    HyperRectangle<DIM> init_set;
+    init_set.lower_bounds(0) = 0.4;
+    init_set.upper_bounds(0) = 0.6;
+    prob->init_sets.push_back(std::move(init_set));
+
+    // Unsafe sets
+    HyperRectangle<DIM> unsafe_set_1;
+    unsafe_set_1.lower_bounds(0) = 0.8;
+    unsafe_set_1.upper_bounds(0) = 1.0;
+    prob->unsafe_sets.push_back(std::move(unsafe_set_1));
+    HyperRectangle<DIM> unsafe_set_2;
+    unsafe_set_2.lower_bounds(0) = 0.0;
+    unsafe_set_2.upper_bounds(0) = 0.2;
+    prob->unsafe_sets.push_back(std::move(unsafe_set_2));
+
+    // Safe set
+    HyperRectangle<DIM> safe_set;
+    safe_set.lower_bounds(0) = 0.2;
+    safe_set.upper_bounds(0) = 0.8;
+    prob->safe_sets.push_back(std::move(safe_set));
 
     bry_deg_t deg = 10;
     PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, deg);
 
-    synthesizer.setInitialSets(std::move(init_sets));
-    synthesizer.setUnsafeSets(std::move(unsafe_sets));
-    synthesizer.setSafeSets(std::move(safe_sets));
+    prob->time_horizon = 5;
+    synthesizer.setProblem(prob);
 
     synthesizer.initialize();
-    auto result = synthesizer.synthesize(5);
+    auto result = synthesizer.synthesize();
     
     INFO("Probability of safety: " << result.p_safe);
     INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);

@@ -40,30 +40,36 @@ int main() {
     cov(1, 1) = 0.01;
     std::shared_ptr<Additive2ndMomentNoise<DIM>> noise_ptr = std::make_shared<Additive2ndMomentNoise<DIM>>(cov);
 
-    HyperRectangle<DIM> workspace;
-    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-0.1, -0.1);
-    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(1.0, 1.0);
+    std::shared_ptr<SynthesisProblem<DIM>> prob(new SynthesisProblem<DIM>());
+
+    prob->workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-0.1, -0.1);
+    prob->workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(1.0, 1.0);
 
     // Init set
-    std::vector<HyperRectangle<DIM>> init_sets(1);
-    init_sets[0].lower_bounds(0) = 0.3;
-    init_sets[0].upper_bounds(0) = 0.5;
-    init_sets[0].lower_bounds(1) = 0.2;
-    init_sets[0].upper_bounds(1) = 0.3;
+    HyperRectangle<DIM> init_set;
+    init_set.lower_bounds(0) = 0.3;
+    init_set.upper_bounds(0) = 0.5;
+    init_set.lower_bounds(1) = 0.2;
+    init_set.upper_bounds(1) = 0.3;
+    prob->init_sets.push_back(std::move(init_set));
 
     // Unsafe set
-    std::vector<HyperRectangle<DIM>> unsafe_sets(2);
-    unsafe_sets[0].lower_bounds(0) = 0.2;
-    unsafe_sets[0].upper_bounds(0) = 0.3;
-    unsafe_sets[0].lower_bounds(1) = 0.6;
-    unsafe_sets[0].upper_bounds(1) = 0.7;
-    unsafe_sets[1].lower_bounds(0) = 0.7;
-    unsafe_sets[1].upper_bounds(0) = 0.8;
-    unsafe_sets[1].lower_bounds(1) = 0.2;
-    unsafe_sets[1].upper_bounds(1) = 0.3;
+    HyperRectangle<DIM> unsafe_set_1;
+    unsafe_set_1.lower_bounds(0) = 0.2;
+    unsafe_set_1.upper_bounds(0) = 0.3;
+    unsafe_set_1.lower_bounds(1) = 0.6;
+    unsafe_set_1.upper_bounds(1) = 0.7;
+    prob->init_sets.push_back(std::move(unsafe_set_1));
+    HyperRectangle<DIM> unsafe_set_2;
+    unsafe_set_2.lower_bounds(0) = 0.7;
+    unsafe_set_2.upper_bounds(0) = 0.8;
+    unsafe_set_2.lower_bounds(1) = 0.2;
+    unsafe_set_2.upper_bounds(1) = 0.3;
+    prob->init_sets.push_back(std::move(unsafe_set_2));
 
     // Safe set
-    std::vector<HyperRectangle<DIM>> safe_sets(7);
+    prob->safe_sets.resize(7);
+    std::vector<HyperRectangle<DIM>>& safe_sets = prob->safe_sets;
     safe_sets[0].lower_bounds(0) = 0.0;
     safe_sets[0].upper_bounds(0) = 0.7;
     safe_sets[0].lower_bounds(1) = 0.0;
@@ -102,13 +108,12 @@ int main() {
     bry_deg_t deg = 10;
     PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, deg);
 
-    synthesizer.setWorkspace(workspace);
-    synthesizer.setInitialSets(std::move(init_sets));
-    synthesizer.setUnsafeSets(std::move(unsafe_sets));
-    synthesizer.setSafeSets(std::move(safe_sets));
+    prob->time_horizon = 5;
+
+    synthesizer.setProblem(prob);
 
     synthesizer.initialize();
-    auto result = synthesizer.synthesize(4);
+    auto result = synthesizer.synthesize();
     
     INFO("Probability of safety: " << result.p_safe);
     INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
