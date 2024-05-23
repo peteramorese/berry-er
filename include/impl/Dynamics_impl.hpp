@@ -48,13 +48,13 @@ BRY::bry_int_t BRY::PolynomialDynamics<DIM>::composedDegree(bry_int_t m) const {
 }
 
 template <std::size_t DIM>
-Eigen::MatrixXd BRY::PolynomialDynamics<DIM>::dynamicsPowerMatrix(bry_int_t m) const {
+BRY::Matrix BRY::PolynomialDynamics<DIM>::dynamicsPowerMatrix(bry_int_t m) const {
     BRY::bry_int_t p = composedDegree(m);
     BRY::bry_int_t m_monoms = pow(m + 1, DIM);
     BRY::bry_int_t p_monoms = pow(p + 1, DIM);
 
-    Eigen::MatrixXd F(p_monoms, m_monoms);
-    F.col(0) = Eigen::VectorXd::Zero(p_monoms);
+    Matrix F(p_monoms, m_monoms);
+    F.col(0) = Vector::Zero(p_monoms);
     F(0, 0) = 1.0;
 
     std::array<bry_int_t, DIM> dimensions;

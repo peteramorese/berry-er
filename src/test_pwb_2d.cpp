@@ -164,7 +164,7 @@ int main(int argc, char** argv) {
     INFO("Probability of safety: " << result.p_safe);
     INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
 
-    Eigen::MatrixXd b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(barrier_deg.get());
+    Matrix b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(barrier_deg.get());
     auto certificate_power = transform(*result.certificate, b_to_p);
 
     INFO("Barrier: " << certificate_power);

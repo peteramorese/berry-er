@@ -27,7 +27,7 @@ class PolynomialDynamics {
         /// @brief Compute the dynamics power matrix 'F'
         /// @param m Max exponent of the dynamics (degree of barrier)
         /// @return Dynamics composition matrix of size `p^d` by `m^d` 
-        Eigen::MatrixXd dynamicsPowerMatrix(bry_int_t m) const;
+        Matrix dynamicsPowerMatrix(bry_int_t m) const;
 
     private:
         std::vector<Polynomial<DIM, Basis::Power>> m_f;

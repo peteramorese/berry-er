@@ -12,7 +12,7 @@
 
 using namespace BRY;
 
-void writeMatrixToFile(const Eigen::MatrixXd& matrix, const std::string& filename) {
+void writeMatrixToFile(const Matrix& matrix, const std::string& filename) {
     std::ofstream file(filename);
     if (file.is_open()) {
         // Write matrix dimensions
@@ -219,7 +219,7 @@ int main(int argc, char** argv) {
     prob->time_horizon = time_steps.get();
     synthesizer.setProblem(prob);
 
-    Eigen::MatrixXd b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(barrier_deg.get());
+    Matrix b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(barrier_deg.get());
 
     auto[A, b] = synthesizer.getConstraintMatrices(deg_increase.get());
     if (verbose) {
@@ -260,7 +260,7 @@ int main(int argc, char** argv) {
 
 
 
-    //Eigen::MatrixXd phi_inv = BernsteinBasisTransform<DIM>::bernToPwrMatrix(2);
+    //Matrix phi_inv = BernsteinBasisTransform<DIM>::bernToPwrMatrix(2);
     //DEBUG("phi inv: \n" << phi_inv);
     
 
@@ -278,8 +278,8 @@ int main(int argc, char** argv) {
     //DEBUG("Dynamics[0]: " << dynamics[0]);
     //DEBUG("Dynamics[1]: " << dynamics[1]);
 
-    //Eigen::MatrixXd dyn_mat = dynamics.dynamicsPowerMatrix(2);
-    //Eigen::MatrixXd nice_dyn_mat = dyn_mat.unaryExpr([](double x) {
+    //Matrix dyn_mat = dynamics.dynamicsPowerMatrix(2);
+    //Matrix nice_dyn_mat = dyn_mat.unaryExpr([](double x) {
     //    if (std::abs(x) < 0.0001)
     //        return 0.0;
     //    else
@@ -301,7 +301,7 @@ int main(int argc, char** argv) {
     
     //Additive2ndMomentNoise<2> noise(cov);
 
-    //Eigen::MatrixXd add_noise_mat = noise.getAdditiveNoiseMatrix(2);
+    //Matrix add_noise_mat = noise.getAdditiveNoiseMatrix(2);
     //DEBUG("noise mat: \n" << add_noise_mat);
 
     //HyperRectangle<1> set;

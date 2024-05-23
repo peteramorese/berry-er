@@ -15,7 +15,7 @@ class Additive2ndMomentNoise {
         Additive2ndMomentNoise() = delete;
         Additive2ndMomentNoise(const Covariance<DIM>& covariance);
 
-        Eigen::MatrixXd additiveNoiseMatrix(bry_int_t m) const;
+        Matrix additiveNoiseMatrix(bry_int_t m) const;
         
     private:
         Covariance<DIM> m_cov;

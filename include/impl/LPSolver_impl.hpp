@@ -40,7 +40,7 @@ BRY::LPSolver::LPSolver(const std::string& solver_id, bry_int_t n_monoms)
     }
 }
 
-void BRY::LPSolver::setWorkspaceConstraint(const Eigen::MatrixXd& beta_coeffs) {
+void BRY::LPSolver::setWorkspaceConstraint(const Matrix& beta_coeffs) {
 #ifdef BRY_ENABLE_BOUNDS_CHECK
     ASSERT(beta_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
 #endif
@@ -56,7 +56,7 @@ void BRY::LPSolver::setWorkspaceConstraint(const Eigen::MatrixXd& beta_coeffs) {
     INFO("[Workspace] Added " << beta_coeffs.rows() << " constraints");
 }
 
-void BRY::LPSolver::addInitialSetConstraint(const Eigen::MatrixXd& beta_coeffs, const Eigen::VectorXd& eta_coeffs) {
+void BRY::LPSolver::addInitialSetConstraint(const Matrix& beta_coeffs, const Vector& eta_coeffs) {
     bry_int_t rows = eta_coeffs.size();
 #ifdef BRY_ENABLE_BOUNDS_CHECK
     ASSERT(beta_coeffs.rows() == rows, "Number of rows in `beta_coeffs` does not match elements in `eta_coeffs`");
@@ -74,7 +74,7 @@ void BRY::LPSolver::addInitialSetConstraint(const Eigen::MatrixXd& beta_coeffs, 
     INFO("[Initial set] Added " << rows << " constraints");
 }
 
-void BRY::LPSolver::addUnsafeSetConstraint(const Eigen::MatrixXd& beta_coeffs, const Eigen::VectorXd& lower_bound) {
+void BRY::LPSolver::addUnsafeSetConstraint(const Matrix& beta_coeffs, const Vector& lower_bound) {
     bry_int_t rows = lower_bound.size();
 #ifdef BRY_ENABLE_BOUNDS_CHECK
     ASSERT(beta_coeffs.rows() == rows, "Number of rows in `beta_coeffs` does not match elements in `lower_bound`");
@@ -92,7 +92,7 @@ void BRY::LPSolver::addUnsafeSetConstraint(const Eigen::MatrixXd& beta_coeffs, c
     INFO("[Unsafe set] Added " << rows << " constraints");
 }
 
-void BRY::LPSolver::addSafeSetConstraint(const Eigen::MatrixXd& beta_coeffs, const Eigen::VectorXd& gamma_coeffs) {
+void BRY::LPSolver::addSafeSetConstraint(const Matrix& beta_coeffs, const Vector& gamma_coeffs) {
     bry_int_t rows = gamma_coeffs.size();
 #ifdef BRY_ENABLE_BOUNDS_CHECK
     ASSERT(beta_coeffs.rows() == rows, "Number of rows in `beta_coeffs` does not match elements in `gamma_coeffs`");
@@ -139,7 +139,7 @@ BRY::LPSolver::Result BRY::LPSolver::solve(uint32_t time_horizon) {
 
     const ort::MPSolver::ResultStatus result_status = m_solver->Solve();
 
-    Eigen::VectorXd beta_values(m_n_monoms);
+    Vector beta_values(m_n_monoms);
     for (bry_int_t i = 0; i < m_n_monoms; ++i) {
         beta_values(i) = m_beta[i]->solution_value();
     }

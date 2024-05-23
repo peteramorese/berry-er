@@ -11,7 +11,7 @@ struct HyperRectangle {
         Eigen::Vector<bry_float_t, DIM> upper_bounds = Eigen::Vector<bry_float_t, DIM>::Constant(1.0);
 
     public:
-        Eigen::MatrixXd transformationMatrix(bry_int_t m) const;
+        Matrix transformationMatrix(bry_int_t m) const;
 
         BRY_INL Eigen::Vector<bry_float_t, DIM> scaleToUnit() const;
         BRY_INL Eigen::Vector<bry_float_t, DIM> translationToUnit() const;

@@ -24,7 +24,7 @@ class LPSolver {
             bry_float_t eta, gamma;
 
             /// @brief Optimal barrier coefficients
-            Eigen::VectorXd beta_values;
+            Vector beta_values;
         };
 
     public:
@@ -35,22 +35,22 @@ class LPSolver {
 
         /// @brief Set the constraint for non-negativity over the workspace (B(x) >= 0)
         /// @param beta_coeffs Coefficient matrix for beta vector
-        void setWorkspaceConstraint(const Eigen::MatrixXd& beta_coeffs);
+        void setWorkspaceConstraint(const Matrix& beta_coeffs);
 
         /// @brief Add constraint for an intial set region (B(x) - eta <= 0)
         /// @param beta_coeffs Coefficient matrix for beta vector
         /// @param eta_coeffs Coefficient vector for eta (number of elements must match rows in `beta_coeffs`)
-        void addInitialSetConstraint(const Eigen::MatrixXd& beta_coeffs, const Eigen::VectorXd& eta_coeffs);
+        void addInitialSetConstraint(const Matrix& beta_coeffs, const Vector& eta_coeffs);
 
         /// @brief Add constraint for an unsafe set region (B(x) > 1)
         /// @param beta_coeffs Coefficient matrix for beta vector
         /// @param lower_bound Vector of lower bound scalars (RHS)
-        void addUnsafeSetConstraint(const Eigen::MatrixXd& beta_coeffs, const Eigen::VectorXd& lower_bound);
+        void addUnsafeSetConstraint(const Matrix& beta_coeffs, const Vector& lower_bound);
 
         /// @brief Add constraint for a safe set region (E[B(f(x) + v)] - B(x) - gamma <= 0)
         /// @param beta_coeffs Coefficient matrix for beta vector
         /// @param gamma_coeffs Coefficient vector for gamma (number of elements must match rows in `beta_coeffs`)
-        void addSafeSetConstraint(const Eigen::MatrixXd& beta_coeffs, const Eigen::VectorXd& gamma_coeffs);
+        void addSafeSetConstraint(const Matrix& beta_coeffs, const Vector& gamma_coeffs);
 
         /// @brief Give a hint to the optimizer using the trivial barrier (B(x) = 1, eta = 1, gamma = 0)
         void setTrivialBarrierHint();
@@ -60,7 +60,7 @@ class LPSolver {
         void setTimeLimit(int64_t time_limit_ms);
 
         /* TODO */
-        //void enforceBoundaryConstraints(const Eigen::MatrixXd& constraint);
+        //void enforceBoundaryConstraints(const Matrix& constraint);
 
         /// @brief Solve the optimization problem for a given time horizon
         /// @param time_horizon Number of timesteps to verify 

@@ -69,7 +69,7 @@ int main() {
     INFO("Probability of safety: " << result.p_safe);
     INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
 
-    Eigen::MatrixXd b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(deg);
+    Matrix b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(deg);
     auto certificate_power = transform(*result.certificate, b_to_p);
 
     INFO("Barrier: " << certificate_power);
@@ -82,7 +82,7 @@ int main() {
         }
     }
 
-    Eigen::MatrixXd phi_inv = BernsteinBasisTransform<DIM>::bernToPwrMatrix(2);
+    Matrix phi_inv = BernsteinBasisTransform<DIM>::bernToPwrMatrix(2);
     DEBUG("phi inv: \n" << phi_inv);
 
     return 0;

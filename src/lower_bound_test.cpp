@@ -61,12 +61,12 @@ int main(int argc, char** argv) {
     //workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.9, 0.9);
 
 
-    //Eigen::MatrixXd b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(deg);
-    Eigen::MatrixXd p_to_b = BernsteinBasisTransform<DIM>::pwrToBernMatrix(deg, deg_inc.get());
+    //Matrix b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(deg);
+    Matrix p_to_b = BernsteinBasisTransform<DIM>::pwrToBernMatrix(deg, deg_inc.get());
 
     //DEBUG("ws tf: " << workspace.transformationMatrix(deg));
-    Eigen::MatrixXd ws_tf = workspace.transformationMatrix(deg);
-    Eigen::MatrixXd t_mat = p_to_b * ws_tf;
+    Matrix ws_tf = workspace.transformationMatrix(deg);
+    Matrix t_mat = p_to_b * ws_tf;
     //DEBUG("tmat: " << t_mat);
     //auto p_bern_tf = transform(p, t_mat);
     Eigen::VectorXd pb_vec_tf = t_mat * p_vec;

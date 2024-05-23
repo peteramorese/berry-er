@@ -7,10 +7,10 @@
 #include <Eigen/Core>
 
 template <std::size_t DIM>
-Eigen::MatrixXd BRY::HyperRectangle<DIM>::transformationMatrix(bry_int_t m) const {
+BRY::Matrix BRY::HyperRectangle<DIM>::transformationMatrix(bry_int_t m) const {
     BRY::bry_int_t m_monoms = pow(m + 1, DIM);
 
-    Eigen::MatrixXd T(m_monoms, m_monoms);
+    Matrix T(m_monoms, m_monoms);
     T.setZero();
 
     Eigen::Vector<bry_float_t, DIM> scale = scaleFromUnit();

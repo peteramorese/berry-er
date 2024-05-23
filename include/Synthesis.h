@@ -46,7 +46,7 @@ class PolyDynamicsSynthesizer {
 
         /// @brief Get the linear program matrices
         /// @return Pair: {A, b} where Ax >= b
-        std::pair<Eigen::MatrixXd, Eigen::VectorXd> getConstraintMatrices(bry_int_t degree_increase = 0) const;
+        std::pair<Matrix, Vector> getConstraintMatrices(bry_int_t degree_increase = 0) const;
 
         /// @brief Set a time limit for the solver
         /// @param time_limit_ms Time limit in milliseconds

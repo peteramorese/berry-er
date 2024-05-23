@@ -118,7 +118,7 @@ int main() {
     INFO("Probability of safety: " << result.p_safe);
     INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
 
-    Eigen::MatrixXd b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(deg);
+    Matrix b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(deg);
     auto certificate_power = transform(*result.certificate, b_to_p);
 
     INFO("Barrier: " << certificate_power);
@@ -147,8 +147,8 @@ int main() {
     //DEBUG("Dynamics[0]: " << dynamics[0]);
     //DEBUG("Dynamics[1]: " << dynamics[1]);
 
-    //Eigen::MatrixXd dyn_mat = dynamics.dynamicsPowerMatrix(2);
-    //Eigen::MatrixXd nice_dyn_mat = dyn_mat.unaryExpr([](double x) {
+    //Matrix dyn_mat = dynamics.dynamicsPowerMatrix(2);
+    //Matrix nice_dyn_mat = dyn_mat.unaryExpr([](double x) {
     //    if (std::abs(x) < 0.0001)
     //        return 0.0;
     //    else
@@ -170,7 +170,7 @@ int main() {
     
     //Additive2ndMomentNoise<2> noise(cov);
 
-    //Eigen::MatrixXd add_noise_mat = noise.getAdditiveNoiseMatrix(2);
+    //Matrix add_noise_mat = noise.getAdditiveNoiseMatrix(2);
     //DEBUG("noise mat: \n" << add_noise_mat);
 
     //HyperRectangle<1> set;
