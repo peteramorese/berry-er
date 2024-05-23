@@ -16,8 +16,8 @@ int main(int argc, char** argv) {
 	ArgParser parser(argc, argv);
 	bool cp_coeffs = parser.parse<void>("cp-coeffs", 'c', "Print the copy-pastable coefficients").has();
 	auto solver_id = parser.parse<std::string>("s-id", 's', "SCIP", "Solver ID");
-	auto barrier_deg = parser.parse<bry_deg_t>("deg", 'd', 4l, "Barrier degree");
-	auto deg_increase = parser.parse<bry_deg_t>("deg-inc", 'i', 0l, "Barrier degree increase");
+	auto barrier_deg = parser.parse<bry_int_t>("deg", 'd', 4l, "Barrier degree");
+	auto deg_increase = parser.parse<bry_int_t>("deg-inc", 'i', 0l, "Barrier degree increase");
 	auto time_steps = parser.parse<uint64_t>("ts", 't', 5, "Number of time steps");
     parser.enableHelp();
 
@@ -152,7 +152,7 @@ int main(int argc, char** argv) {
     //safe_sets[4].upper_bounds(1) = 0.5;
 
 
-    //bry_deg_t deg = 8;
+    //bry_int_t deg = 8;
     PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, barrier_deg.get(), solver_id.get());
 
     prob->time_horizon = time_steps.get();

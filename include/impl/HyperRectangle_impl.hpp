@@ -7,8 +7,8 @@
 #include <Eigen/Core>
 
 template <std::size_t DIM>
-Eigen::MatrixXd BRY::HyperRectangle<DIM>::transformationMatrix(bry_deg_t m) const {
-    BRY::bry_deg_t m_monoms = pow(m + 1, DIM);
+Eigen::MatrixXd BRY::HyperRectangle<DIM>::transformationMatrix(bry_int_t m) const {
+    BRY::bry_int_t m_monoms = pow(m + 1, DIM);
 
     Eigen::MatrixXd T(m_monoms, m_monoms);
     T.setZero();
@@ -17,7 +17,7 @@ Eigen::MatrixXd BRY::HyperRectangle<DIM>::transformationMatrix(bry_deg_t m) cons
     Eigen::Vector<bry_float_t, DIM> translation = translationFromUnit();
 
     for (auto row_midx = mIdxW(DIM, m + 1); !row_midx.last(); ++row_midx) {
-        std::vector<bry_idx_t> index_bounds(row_midx.size());
+        std::vector<bry_int_t> index_bounds(row_midx.size());
         for (std::size_t d = 0; d < DIM; ++d) {
             index_bounds[d] = m + 1 - row_midx[d];
         }

@@ -39,14 +39,14 @@ class PolyDynamicsSynthesizer {
     public:
         PolyDynamicsSynthesizer(const std::shared_ptr<PolynomialDynamics<DIM>>& dynamics, 
                                 const std::shared_ptr<Additive2ndMomentNoise<DIM>>& noise, 
-                                bry_deg_t barrier_deg,
+                                bry_int_t barrier_deg,
                                 const std::string& solver_id = "SCIP");
 
         void setProblem(const std::shared_ptr<SynthesisProblem<DIM>>& problem);
 
         /// @brief Get the linear program matrices
         /// @return Pair: {A, b} where Ax >= b
-        std::pair<Eigen::MatrixXd, Eigen::VectorXd> getConstraintMatrices(bry_deg_t degree_increase = 0) const;
+        std::pair<Eigen::MatrixXd, Eigen::VectorXd> getConstraintMatrices(bry_int_t degree_increase = 0) const;
 
         /// @brief Set a time limit for the solver
         /// @param time_limit_ms Time limit in milliseconds
@@ -54,7 +54,7 @@ class PolyDynamicsSynthesizer {
 
         /// @brief Initialize the synthesizer
         /// @param degree_increase Decrease the conservativeness by increasing the number constraints
-        void initialize(bry_deg_t degree_increase = 0);
+        void initialize(bry_int_t degree_increase = 0);
 
         SynthesisSolution<DIM> synthesize();
 
@@ -62,7 +62,7 @@ class PolyDynamicsSynthesizer {
         std::shared_ptr<PolynomialDynamics<DIM>> m_dynamics;
         std::shared_ptr<Additive2ndMomentNoise<DIM>> m_noise;
         std::unique_ptr<LPSolver> m_solver;
-        bry_deg_t m_barrier_deg;
+        bry_int_t m_barrier_deg;
 
         bool m_initialized = false;
 

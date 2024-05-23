@@ -41,8 +41,8 @@ int main(int argc, char** argv) {
     bool verbose = parser.parse<void>('v', "Verbose").has();
     bool solve = parser.parse<void>('r', "Solve the synthesis problem").has();
 	auto solver_id = parser.parse<std::string>("s-id", 's', "SCIP", "Solver ID");
-	auto barrier_deg = parser.parse<bry_deg_t>("deg", 'd', 4l, "Barrier degree");
-	auto deg_increase = parser.parse<bry_deg_t>("deg-inc", 'i', 0l, "Barrier degree increase");
+	auto barrier_deg = parser.parse<bry_int_t>("deg", 'd', 4l, "Barrier degree");
+	auto deg_increase = parser.parse<bry_int_t>("deg-inc", 'i', 0l, "Barrier degree increase");
 	auto time_steps = parser.parse<uint64_t>("ts", 't', 5, "Number of time steps");
     parser.enableHelp();
 
@@ -137,22 +137,22 @@ int main(int argc, char** argv) {
     boundary_left.upper_bounds(1) = 0.5 + boundary_width(1);
     prob->unsafe_sets.push_back(boundary_left);
     printSetBounds(boundary_left);
-    //// Boundary right
-    //HyperRectangle<DIM> boundary_right;
-    //boundary_right.lower_bounds(0) = 0.5;
-    //boundary_right.upper_bounds(0) = 0.5 + boundary_width(0);
-    //boundary_right.lower_bounds(1) = -0.5 - boundary_width(1);
-    //boundary_right.upper_bounds(1) = 0.5 + boundary_width(1);
-    //prob->unsafe_sets.push_back(boundary_right);
-    //printSetBounds(boundary_right);
-    //// Boundary top
-    //HyperRectangle<DIM> boundary_top;
-    //boundary_top.lower_bounds(0) = -1.0;
-    //boundary_top.upper_bounds(0) = 0.5;
-    //boundary_top.lower_bounds(1) = 0.5;
-    //boundary_top.upper_bounds(1) = 0.5 + boundary_width(1);
-    //prob->unsafe_sets.push_back(boundary_top);
-    //printSetBounds(boundary_top);
+    // Boundary right
+    HyperRectangle<DIM> boundary_right;
+    boundary_right.lower_bounds(0) = 0.5;
+    boundary_right.upper_bounds(0) = 0.5 + boundary_width(0);
+    boundary_right.lower_bounds(1) = -0.5 - boundary_width(1);
+    boundary_right.upper_bounds(1) = 0.5 + boundary_width(1);
+    prob->unsafe_sets.push_back(boundary_right);
+    printSetBounds(boundary_right);
+    // Boundary top
+    HyperRectangle<DIM> boundary_top;
+    boundary_top.lower_bounds(0) = -1.0;
+    boundary_top.upper_bounds(0) = 0.5;
+    boundary_top.lower_bounds(1) = 0.5;
+    boundary_top.upper_bounds(1) = 0.5 + boundary_width(1);
+    prob->unsafe_sets.push_back(boundary_top);
+    printSetBounds(boundary_top);
     // Boundary bottom
     HyperRectangle<DIM> boundary_bottom;
     boundary_bottom.lower_bounds(0) = -1.0;
@@ -161,56 +161,57 @@ int main(int argc, char** argv) {
     boundary_bottom.upper_bounds(1) = -0.5;
     prob->unsafe_sets.push_back(boundary_bottom);
     printSetBounds(boundary_bottom);
-    //// Non convex unsafe regions
-    //HyperRectangle<DIM> upper_region;
-    //upper_region.lower_bounds(0) = -0.57;
-    //upper_region.upper_bounds(0) = -0.53;
-    //upper_region.lower_bounds(1) = -0.17;
-    //upper_region.upper_bounds(1) = -0.13;
-    //prob->unsafe_sets.push_back(upper_region);
-    //printSetBounds(upper_region);
-    //HyperRectangle<DIM> lower_region;
-    //lower_region.lower_bounds(0) = -0.57;
-    //lower_region.upper_bounds(0) = -0.53;
-    //lower_region.lower_bounds(1) = 0.28;
-    //lower_region.upper_bounds(1) = 0.32;
-    //prob->unsafe_sets.push_back(lower_region);
-    //printSetBounds(lower_region);
+    // Non convex unsafe regions
+    HyperRectangle<DIM> upper_region;
+    upper_region.lower_bounds(0) = -0.57;
+    upper_region.upper_bounds(0) = -0.53;
+    upper_region.lower_bounds(1) = -0.17;
+    upper_region.upper_bounds(1) = -0.13;
+    prob->unsafe_sets.push_back(upper_region);
+    printSetBounds(upper_region);
+    HyperRectangle<DIM> lower_region;
+    lower_region.lower_bounds(0) = -0.57;
+    lower_region.upper_bounds(0) = -0.53;
+    lower_region.lower_bounds(1) = 0.28;
+    lower_region.upper_bounds(1) = 0.32;
+    prob->unsafe_sets.push_back(lower_region);
+    printSetBounds(lower_region);
 
     // Safe set
-    HyperRectangle<DIM> safe_set;
-    safe_set.lower_bounds(0) = -1.0;
-    safe_set.upper_bounds(0) = 0.5;
-    safe_set.lower_bounds(1) = -0.5;
-    safe_set.upper_bounds(1) = 0.5;
-    prob->safe_sets.push_back(safe_set);
 
-    //prob->safe_sets.resize(5);
-    //std::vector<HyperRectangle<DIM>>& safe_sets = prob->safe_sets;
-    //safe_sets[0].lower_bounds(0) = -1.0;
-    //safe_sets[0].upper_bounds(0) = -0.57;
-    //safe_sets[0].lower_bounds(1) = -0.5;
-    //safe_sets[0].upper_bounds(1) = 0.5;
+    //HyperRectangle<DIM> safe_set;
+    //safe_set.lower_bounds(0) = -1.0;
+    //safe_set.upper_bounds(0) = 0.5;
+    //safe_set.lower_bounds(1) = -0.5;
+    //safe_set.upper_bounds(1) = 0.5;
+    //prob->safe_sets.push_back(safe_set);
 
-    //safe_sets[1].lower_bounds(0) = -0.57;
-    //safe_sets[1].upper_bounds(0) = -0.53;
-    //safe_sets[1].lower_bounds(1) = -0.5;
-    //safe_sets[1].upper_bounds(1) = -0.17;
+    prob->safe_sets.resize(5);
+    std::vector<HyperRectangle<DIM>>& safe_sets = prob->safe_sets;
+    safe_sets[0].lower_bounds(0) = -1.0;
+    safe_sets[0].upper_bounds(0) = -0.57;
+    safe_sets[0].lower_bounds(1) = -0.5;
+    safe_sets[0].upper_bounds(1) = 0.5;
 
-    //safe_sets[2].lower_bounds(0) = -0.57;
-    //safe_sets[2].upper_bounds(0) = -0.53;
-    //safe_sets[2].lower_bounds(1) = -0.13;
-    //safe_sets[2].upper_bounds(1) = 0.28;
+    safe_sets[1].lower_bounds(0) = -0.57;
+    safe_sets[1].upper_bounds(0) = -0.53;
+    safe_sets[1].lower_bounds(1) = -0.5;
+    safe_sets[1].upper_bounds(1) = -0.17;
 
-    //safe_sets[3].lower_bounds(0) = -0.57;
-    //safe_sets[3].upper_bounds(0) = -0.53;
-    //safe_sets[3].lower_bounds(1) = 0.32;
-    //safe_sets[3].upper_bounds(1) = 0.5;
+    safe_sets[2].lower_bounds(0) = -0.57;
+    safe_sets[2].upper_bounds(0) = -0.53;
+    safe_sets[2].lower_bounds(1) = -0.13;
+    safe_sets[2].upper_bounds(1) = 0.28;
 
-    //safe_sets[4].lower_bounds(0) = -0.53;
-    //safe_sets[4].upper_bounds(0) = 0.5;
-    //safe_sets[4].lower_bounds(1) = -0.5;
-    //safe_sets[4].upper_bounds(1) = 0.5;
+    safe_sets[3].lower_bounds(0) = -0.57;
+    safe_sets[3].upper_bounds(0) = -0.53;
+    safe_sets[3].lower_bounds(1) = 0.32;
+    safe_sets[3].upper_bounds(1) = 0.5;
+
+    safe_sets[4].lower_bounds(0) = -0.53;
+    safe_sets[4].upper_bounds(0) = 0.5;
+    safe_sets[4].lower_bounds(1) = -0.5;
+    safe_sets[4].upper_bounds(1) = 0.5;
 #endif
 
     PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, barrier_deg.get(), solver_id.get());
@@ -226,10 +227,14 @@ int main(int argc, char** argv) {
         NEW_LINE;
         INFO("b: \n" << b.transpose());
     }
+    INFO("Exporting...");
     writeMatrixToFile(A, "A.txt");
     writeMatrixToFile(b, "b.txt");
     writeMatrixToFile(b_to_p, "Phi_inv.txt");
+    INFO("Done!");
+    writeMatrixToFile(A, "A.txt");
     if (solve) {
+        INFO("Solving...");
         synthesizer.initialize(deg_increase.get());
         auto result = synthesizer.synthesize();
         

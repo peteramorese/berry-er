@@ -105,7 +105,7 @@ int main() {
     safe_sets[6].lower_bounds(1) = 0.0;
     safe_sets[6].upper_bounds(1) = 0.2;
 
-    bry_deg_t deg = 10;
+    bry_int_t deg = 10;
     PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, deg);
 
     prob->time_horizon = 5;

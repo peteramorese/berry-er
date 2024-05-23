@@ -7,7 +7,7 @@
 /* PolyDynamicsSynthesizer */
 
 template <std::size_t DIM>
-BRY::PolyDynamicsSynthesizer<DIM>::PolyDynamicsSynthesizer(const std::shared_ptr<PolynomialDynamics<DIM>>& dynamics, const std::shared_ptr<Additive2ndMomentNoise<DIM>>& noise, bry_deg_t barrier_deg, const std::string& solver_id)
+BRY::PolyDynamicsSynthesizer<DIM>::PolyDynamicsSynthesizer(const std::shared_ptr<PolynomialDynamics<DIM>>& dynamics, const std::shared_ptr<Additive2ndMomentNoise<DIM>>& noise, bry_int_t barrier_deg, const std::string& solver_id)
     : m_dynamics(dynamics)
     , m_solver(new LPSolver(solver_id, pow(barrier_deg + 1, DIM)))
     , m_barrier_deg(barrier_deg)
@@ -20,12 +20,12 @@ void BRY::PolyDynamicsSynthesizer<DIM>::setProblem(const std::shared_ptr<Synthes
 }
 
 template <std::size_t DIM>
-std::pair<Eigen::MatrixXd, Eigen::VectorXd> BRY::PolyDynamicsSynthesizer<DIM>::getConstraintMatrices(bry_deg_t degree_increase) const {
+std::pair<Eigen::MatrixXd, Eigen::VectorXd> BRY::PolyDynamicsSynthesizer<DIM>::getConstraintMatrices(bry_int_t degree_increase) const {
     Eigen::MatrixXd Phi_m = BernsteinBasisTransform<DIM>::pwrToBernMatrix(m_barrier_deg, degree_increase);
     Eigen::MatrixXd Phi_inv_m = BernsteinBasisTransform<DIM>::bernToPwrMatrix(m_barrier_deg);
 
     // Workspace
-    bry_deg_t n_cols = Phi_m.cols() + 2;
+    bry_int_t n_cols = Phi_m.cols() + 2;
     Eigen::MatrixXd ws_beta_coeffs = Phi_m * m_problem->workspace.transformationMatrix(m_barrier_deg) * Phi_inv_m;
     Eigen::MatrixXd ws_coeffs(ws_beta_coeffs.rows(), n_cols);
     //           beta            eta                                           gamma
@@ -37,7 +37,7 @@ std::pair<Eigen::MatrixXd, Eigen::VectorXd> BRY::PolyDynamicsSynthesizer<DIM>::g
         WARN("No initial sets were provided");
     Eigen::MatrixXd init_coeffs(m_problem->init_sets.size() * Phi_m.rows(), n_cols);
     Eigen::VectorXd init_lower_bound = Eigen::VectorXd::Zero(init_coeffs.rows());
-    bry_idx_t i = 0;
+    bry_int_t i = 0;
     for (const HyperRectangle<DIM>& set : m_problem->init_sets) {
         Eigen::MatrixXd beta_coeffs = -Phi_m * set.transformationMatrix(m_barrier_deg) * Phi_inv_m;
         //DEBUG("init beta coeffs \n" << beta_coeffs);
@@ -66,7 +66,7 @@ std::pair<Eigen::MatrixXd, Eigen::VectorXd> BRY::PolyDynamicsSynthesizer<DIM>::g
     if (m_problem->safe_sets.empty())
         WARN("No safe sets were provided");
     Eigen::MatrixXd F_expec_Gamma = m_dynamics->dynamicsPowerMatrix(m_barrier_deg) * m_noise->additiveNoiseMatrix(m_barrier_deg);
-    bry_deg_t p = m_dynamics->composedDegree(m_barrier_deg);
+    bry_int_t p = m_dynamics->composedDegree(m_barrier_deg);
     Eigen::MatrixXd Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(p, degree_increase);
     Eigen::VectorXd gamma_coeffs = Eigen::VectorXd::Ones(Phi_p.cols());
     ASSERT(F_expec_Gamma.rows() == Phi_p.cols(), "Dimension mismatch between F and Phi (p)");
@@ -94,7 +94,7 @@ std::pair<Eigen::MatrixXd, Eigen::VectorXd> BRY::PolyDynamicsSynthesizer<DIM>::g
 }
 
 template <std::size_t DIM>
-void BRY::PolyDynamicsSynthesizer<DIM>::initialize(bry_deg_t degree_increase) {
+void BRY::PolyDynamicsSynthesizer<DIM>::initialize(bry_int_t degree_increase) {
     Eigen::MatrixXd Phi_m = BernsteinBasisTransform<DIM>::pwrToBernMatrix(m_barrier_deg, degree_increase);
     Eigen::MatrixXd Phi_inv_m = BernsteinBasisTransform<DIM>::bernToPwrMatrix(m_barrier_deg);
     //DEBUG("Phi inv m: \n" << Phi_inv_m);
@@ -130,7 +130,7 @@ void BRY::PolyDynamicsSynthesizer<DIM>::initialize(bry_deg_t degree_increase) {
     Eigen::MatrixXd F_expec_Gamma = m_dynamics->dynamicsPowerMatrix(m_barrier_deg) * m_noise->additiveNoiseMatrix(m_barrier_deg);
     //DEBUG("F \n" << m_dynamics->dynamicsPowerMatrix(m_barrier_deg));
     //DEBUG("F expec Gamma: \n" << F_expec_Gamma);
-    bry_deg_t p = m_dynamics->composedDegree(m_barrier_deg);
+    bry_int_t p = m_dynamics->composedDegree(m_barrier_deg);
     Eigen::MatrixXd Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(p, degree_increase);
     //Eigen::VectorXd gamma_coeffs = Phi_inv_p * Eigen::VectorXd::Ones(Phi_inv_p.cols());
     Eigen::VectorXd gamma_coeffs = Eigen::VectorXd::Ones(Phi_p.rows());

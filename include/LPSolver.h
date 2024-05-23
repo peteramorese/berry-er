@@ -31,7 +31,7 @@ class LPSolver {
         /// @brief Create a LP solver using OR-Tools
         /// @param solver_id Solver ID passed to OR-Tools MPSolver
         /// @param n_monoms Number of monomials in barrier
-        LPSolver(const std::string& solver_id, bry_deg_t n_monoms);
+        LPSolver(const std::string& solver_id, bry_int_t n_monoms);
 
         /// @brief Set the constraint for non-negativity over the workspace (B(x) >= 0)
         /// @param beta_coeffs Coefficient matrix for beta vector
@@ -68,7 +68,7 @@ class LPSolver {
 
     private:
         std::unique_ptr<ort::MPSolver> m_solver;
-        bry_deg_t m_n_monoms;
+        bry_int_t m_n_monoms;
         bry_float_t m_inf;
         std::vector<ort::MPVariable*> m_beta;
         ort::MPVariable* m_eta;

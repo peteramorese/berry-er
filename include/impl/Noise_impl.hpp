@@ -11,15 +11,15 @@ BRY::Additive2ndMomentNoise<DIM>::Additive2ndMomentNoise(const Covariance<DIM>& 
 {}
 
 template <std::size_t DIM>
-Eigen::MatrixXd BRY::Additive2ndMomentNoise<DIM>::additiveNoiseMatrix(bry_deg_t m) const {
-    BRY::bry_deg_t m_monoms = pow(m + 1, DIM);
+Eigen::MatrixXd BRY::Additive2ndMomentNoise<DIM>::additiveNoiseMatrix(bry_int_t m) const {
+    BRY::bry_int_t m_monoms = pow(m + 1, DIM);
 
     Eigen::MatrixXd Gamma(m_monoms, m_monoms);
     Gamma.setZero();
 
     for (auto col_midx = mIdxW(DIM, m + 1); !col_midx.last(); ++col_midx) {
 
-        std::vector<bry_idx_t> index_bounds(col_midx.size());
+        std::vector<bry_int_t> index_bounds(col_midx.size());
         for (std::size_t d = 0; d < DIM; ++d)
             index_bounds[d] = col_midx[d] + 1;
 
@@ -28,10 +28,10 @@ Eigen::MatrixXd BRY::Additive2ndMomentNoise<DIM>::additiveNoiseMatrix(bry_deg_t 
             bry_float_t element = 1.0;
 
             bool zero = false;
-            bry_deg_t moment = 0;
+            bry_int_t moment = 0;
             int64_t first_cov_idx = -1;
             for (std::size_t j = 0; j < DIM; ++j) {
-                bry_deg_t exp = col_midx[j] - row_midx[j];
+                bry_int_t exp = col_midx[j] - row_midx[j];
                 if (moment + exp > 2) {
                     zero = true;
                     break;

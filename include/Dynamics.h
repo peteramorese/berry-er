@@ -20,14 +20,14 @@ class PolynomialDynamics {
         BRY_INL Polynomial<DIM, Basis::Power>& operator[](std::size_t j);
         BRY_INL const Polynomial<DIM, Basis::Power>& operator[](std::size_t j) const;
 
-        BRY_INL std::array<bry_deg_t, DIM> degrees() const;
-        BRY_INL bry_deg_t summedDegree() const; 
-        BRY_INL bry_deg_t composedDegree(bry_deg_t m) const; 
+        BRY_INL std::array<bry_int_t, DIM> degrees() const;
+        BRY_INL bry_int_t summedDegree() const; 
+        BRY_INL bry_int_t composedDegree(bry_int_t m) const; 
 
         /// @brief Compute the dynamics power matrix 'F'
         /// @param m Max exponent of the dynamics (degree of barrier)
         /// @return Dynamics composition matrix of size `p^d` by `m^d` 
-        Eigen::MatrixXd dynamicsPowerMatrix(bry_deg_t m) const;
+        Eigen::MatrixXd dynamicsPowerMatrix(bry_int_t m) const;
 
     private:
         std::vector<Polynomial<DIM, Basis::Power>> m_f;

@@ -6,7 +6,7 @@
 
 #include <ortools/linear_solver/linear_solver.pb.h>
 
-BRY::LPSolver::LPSolver(const std::string& solver_id, bry_deg_t n_monoms)
+BRY::LPSolver::LPSolver(const std::string& solver_id, bry_int_t n_monoms)
     : m_solver(ort::MPSolver::CreateSolver(solver_id))
     , m_n_monoms(n_monoms)
 {
@@ -44,9 +44,9 @@ void BRY::LPSolver::setWorkspaceConstraint(const Eigen::MatrixXd& beta_coeffs) {
 #ifdef BRY_ENABLE_BOUNDS_CHECK
     ASSERT(beta_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
 #endif
-    for (bry_idx_t i = 0; i < beta_coeffs.rows(); ++i) {
+    for (bry_int_t i = 0; i < beta_coeffs.rows(); ++i) {
         ort::MPConstraint* row_constraint = m_solver->MakeRowConstraint(0.0, m_inf, "");
-        for (bry_idx_t j = 0; j < beta_coeffs.cols(); ++j) {
+        for (bry_int_t j = 0; j < beta_coeffs.cols(); ++j) {
             row_constraint->SetCoefficient(m_beta[j], beta_coeffs(i, j));
         }
         // Neither eta nor gamma appear in this constraint
@@ -57,14 +57,14 @@ void BRY::LPSolver::setWorkspaceConstraint(const Eigen::MatrixXd& beta_coeffs) {
 }
 
 void BRY::LPSolver::addInitialSetConstraint(const Eigen::MatrixXd& beta_coeffs, const Eigen::VectorXd& eta_coeffs) {
-    bry_idx_t rows = eta_coeffs.size();
+    bry_int_t rows = eta_coeffs.size();
 #ifdef BRY_ENABLE_BOUNDS_CHECK
     ASSERT(beta_coeffs.rows() == rows, "Number of rows in `beta_coeffs` does not match elements in `eta_coeffs`");
     ASSERT(beta_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
 #endif
-    for (bry_idx_t i = 0; i < rows; ++i) {
+    for (bry_int_t i = 0; i < rows; ++i) {
         ort::MPConstraint* row_constraint = m_solver->MakeRowConstraint(0.0, m_inf, "");
-        for (bry_idx_t j = 0; j < beta_coeffs.cols(); ++j) {
+        for (bry_int_t j = 0; j < beta_coeffs.cols(); ++j) {
             row_constraint->SetCoefficient(m_beta[j], beta_coeffs(i, j));
         }
         row_constraint->SetCoefficient(m_eta, eta_coeffs(i));
@@ -75,14 +75,14 @@ void BRY::LPSolver::addInitialSetConstraint(const Eigen::MatrixXd& beta_coeffs, 
 }
 
 void BRY::LPSolver::addUnsafeSetConstraint(const Eigen::MatrixXd& beta_coeffs, const Eigen::VectorXd& lower_bound) {
-    bry_idx_t rows = lower_bound.size();
+    bry_int_t rows = lower_bound.size();
 #ifdef BRY_ENABLE_BOUNDS_CHECK
     ASSERT(beta_coeffs.rows() == rows, "Number of rows in `beta_coeffs` does not match elements in `lower_bound`");
     ASSERT(beta_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
 #endif
-    for (bry_idx_t i = 0; i < rows; ++i) {
+    for (bry_int_t i = 0; i < rows; ++i) {
         ort::MPConstraint* row_constraint = m_solver->MakeRowConstraint(lower_bound(i), m_inf, "");
-        for (bry_idx_t j = 0; j < beta_coeffs.cols(); ++j) {
+        for (bry_int_t j = 0; j < beta_coeffs.cols(); ++j) {
             row_constraint->SetCoefficient(m_beta[j], beta_coeffs(i, j));
         }
         // Neither eta nor gamma appear in this constraint
@@ -93,14 +93,14 @@ void BRY::LPSolver::addUnsafeSetConstraint(const Eigen::MatrixXd& beta_coeffs, c
 }
 
 void BRY::LPSolver::addSafeSetConstraint(const Eigen::MatrixXd& beta_coeffs, const Eigen::VectorXd& gamma_coeffs) {
-    bry_idx_t rows = gamma_coeffs.size();
+    bry_int_t rows = gamma_coeffs.size();
 #ifdef BRY_ENABLE_BOUNDS_CHECK
     ASSERT(beta_coeffs.rows() == rows, "Number of rows in `beta_coeffs` does not match elements in `gamma_coeffs`");
     ASSERT(beta_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
 #endif
-    for (bry_idx_t i = 0; i < rows; ++i) {
+    for (bry_int_t i = 0; i < rows; ++i) {
         ort::MPConstraint* row_constraint = m_solver->MakeRowConstraint(0.0, m_inf, "");
-        for (bry_idx_t j = 0; j < beta_coeffs.cols(); ++j) {
+        for (bry_int_t j = 0; j < beta_coeffs.cols(); ++j) {
             row_constraint->SetCoefficient(m_beta[j], beta_coeffs(i, j));
             //WARN("   beta coeff: " << beta_coeffs(i, j));
         }
@@ -140,7 +140,7 @@ BRY::LPSolver::Result BRY::LPSolver::solve(uint32_t time_horizon) {
     const ort::MPSolver::ResultStatus result_status = m_solver->Solve();
 
     Eigen::VectorXd beta_values(m_n_monoms);
-    for (bry_idx_t i = 0; i < m_n_monoms; ++i) {
+    for (bry_int_t i = 0; i < m_n_monoms; ++i) {
         beta_values(i) = m_beta[i]->solution_value();
     }
 

@@ -15,10 +15,10 @@ using namespace BRY;
 
 int main(int argc, char** argv) {
 	ArgParser parser(argc, argv);
-	auto deg_inc = parser.parse<bry_deg_t>("deg-inc", 'i', 0l, "Degree increase");
+	auto deg_inc = parser.parse<bry_int_t>("deg-inc", 'i', 0l, "Degree increase");
 
     constexpr std::size_t DIM = 2;
-    bry_deg_t deg = 4;
+    bry_int_t deg = 4;
 
     Eigen::Tensor<bry_float_t, DIM> tensor(deg + 1, deg + 1);
     tensor.setValues({
@@ -28,8 +28,8 @@ int main(int argc, char** argv) {
         {13.15478702354328177648, 12.20662695965430089018, -1.69662035716220316317, -2.04142003212581357730, -0.54996795586680491397}, 
         {2.28913616018212096037, 6.62611192786266656185, 9.88752619335051008420, 6.90385232680833382801, 1.80956659588261459248}});
     tensor = tensor.shuffle(Eigen::array<int, 2>{1, 0});
-    //for (bry_idx_t i = 0; i < deg; ++i) {
-    //    for (bry_idx_t j = 0; j < deg; ++j) {
+    //for (bry_int_t i = 0; i < deg; ++i) {
+    //    for (bry_int_t j = 0; j < deg; ++j) {
     //        bry_float_t temp = tensor(i, j);
     //        tensor(i, j) = tensor(j, i);
     //        tensor(j, i) = temp;
