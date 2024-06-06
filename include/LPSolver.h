@@ -24,7 +24,7 @@ class LPSolver {
             bry_float_t eta, gamma;
 
             /// @brief Optimal barrier coefficients
-            Vector beta_values;
+            Vector b_values;
         };
 
     public:
@@ -34,23 +34,23 @@ class LPSolver {
         LPSolver(const std::string& solver_id, bry_int_t n_monoms);
 
         /// @brief Set the constraint for non-negativity over the workspace (B(x) >= 0)
-        /// @param beta_coeffs Coefficient matrix for beta vector
-        void setWorkspaceConstraint(const Matrix& beta_coeffs);
+        /// @param b_coeffs Coefficient matrix for b vector
+        void addWorkspaceConstraint(const Matrix& b_coeffs);
 
         /// @brief Add constraint for an intial set region (B(x) - eta <= 0)
-        /// @param beta_coeffs Coefficient matrix for beta vector
-        /// @param eta_coeffs Coefficient vector for eta (number of elements must match rows in `beta_coeffs`)
-        void addInitialSetConstraint(const Matrix& beta_coeffs, const Vector& eta_coeffs);
+        /// @param b_coeffs Coefficient matrix for b vector
+        /// @param eta_coeffs Coefficient vector for eta (number of elements must match rows in `b_coeffs`)
+        void addInitialSetConstraint(const Matrix& b_coeffs, const Vector& eta_coeffs);
 
         /// @brief Add constraint for an unsafe set region (B(x) > 1)
-        /// @param beta_coeffs Coefficient matrix for beta vector
+        /// @param b_coeffs Coefficient matrix for b vector
         /// @param lower_bound Vector of lower bound scalars (RHS)
-        void addUnsafeSetConstraint(const Matrix& beta_coeffs, const Vector& lower_bound);
+        void addUnsafeSetConstraint(const Matrix& b_coeffs, const Vector& lower_bound);
 
         /// @brief Add constraint for a safe set region (E[B(f(x) + v)] - B(x) - gamma <= 0)
-        /// @param beta_coeffs Coefficient matrix for beta vector
-        /// @param gamma_coeffs Coefficient vector for gamma (number of elements must match rows in `beta_coeffs`)
-        void addSafeSetConstraint(const Matrix& beta_coeffs, const Vector& gamma_coeffs);
+        /// @param b_coeffs Coefficient matrix for b vector
+        /// @param gamma_coeffs Coefficient vector for gamma (number of elements must match rows in `b_coeffs`)
+        void addSafeSetConstraint(const Matrix& b_coeffs, const Vector& gamma_coeffs);
 
         /// @brief Give a hint to the optimizer using the trivial barrier (B(x) = 1, eta = 1, gamma = 0)
         void setTrivialBarrierHint();
@@ -70,7 +70,7 @@ class LPSolver {
         std::unique_ptr<ort::MPSolver> m_solver;
         bry_int_t m_n_monoms;
         bry_float_t m_inf;
-        std::vector<ort::MPVariable*> m_beta;
+        std::vector<ort::MPVariable*> m_b;
         ort::MPVariable* m_eta;
         ort::MPVariable* m_gamma;
 };

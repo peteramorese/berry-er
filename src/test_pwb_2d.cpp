@@ -44,8 +44,10 @@ int main(int argc, char** argv) {
 
     Eigen::Vector<bry_float_t, DIM> boundary_width{0.2, 0.2};
 
-    prob->workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-1.0, -0.5) - boundary_width;
-    prob->workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.5, 0.5) + boundary_width;
+    HyperRectangle<DIM> workspace;
+    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-1.0, -0.5) - boundary_width;
+    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.5, 0.5) + boundary_width;
+    prob->setWorkspace(workspace);
 
     auto printSetBounds = [](const HyperRectangle<DIM>& set) {
         DEBUG("Set bounds: [" 

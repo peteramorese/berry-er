@@ -12,11 +12,14 @@ namespace BRY {
 
 template <std::size_t DIM>
 struct SynthesisProblem {
-    HyperRectangle<DIM> workspace = HyperRectangle<DIM>();
+    std::vector<HyperRectangle<DIM>> workspace_sets = {HyperRectangle<DIM>()};
     std::vector<HyperRectangle<DIM>> init_sets;
     std::vector<HyperRectangle<DIM>> safe_sets;
     std::vector<HyperRectangle<DIM>> unsafe_sets;
     uint32_t time_horizon;
+    
+    void setWorkspace(const HyperRectangle<DIM>& workspace);
+    std::unique_ptr<SynthesisProblem<DIM>> makeSubdividedProblem(uint32_t subdivision);
 };
 
 template <std::size_t DIM>
@@ -46,7 +49,7 @@ class PolyDynamicsSynthesizer {
 
         /// @brief Get the linear program matrices
         /// @return Pair: {A, b} where Ax >= b
-        std::pair<Matrix, Vector> getConstraintMatrices(bry_int_t degree_increase = 0) const;
+        std::pair<Matrix, Vector> getConstraintMatrices(bry_int_t degree_increase = 0, uint32_t subdivision = 0) const;
 
         /// @brief Set a time limit for the solver
         /// @param time_limit_ms Time limit in milliseconds
@@ -54,7 +57,8 @@ class PolyDynamicsSynthesizer {
 
         /// @brief Initialize the synthesizer
         /// @param degree_increase Decrease the conservativeness by increasing the number constraints
-        void initialize(bry_int_t degree_increase = 0);
+        /// @param subdivision Decrease the conservativeness by subdividing
+        void initialize(bry_int_t degree_increase = 0, uint32_t subdivision = 0);
 
         SynthesisSolution<DIM> synthesize();
 

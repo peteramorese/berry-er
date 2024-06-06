@@ -17,7 +17,8 @@ BRY::LPSolver::LPSolver(const std::string& solver_id, bry_int_t n_monoms)
         INFO("Solver '" << solver_id << "' found!");
         INFO("Constructing LP with " << n_monoms + 2 << " variables");
         m_inf = m_solver->infinity();
-        m_solver->MakeNumVarArray(n_monoms, 0.0, m_inf, "beta", &m_beta);
+        //m_solver->MakeNumVarArray(n_monoms, 0.0, m_inf, "beta", &m_b);
+        m_solver->MakeNumVarArray(n_monoms, -m_inf, m_inf, "b", &m_b);
         m_eta = m_solver->MakeNumVar(0.0, m_inf, "eta");
         m_gamma = m_solver->MakeNumVar(0.0, m_inf, "gamma");
 
@@ -40,32 +41,32 @@ BRY::LPSolver::LPSolver(const std::string& solver_id, bry_int_t n_monoms)
     }
 }
 
-void BRY::LPSolver::setWorkspaceConstraint(const Matrix& beta_coeffs) {
+void BRY::LPSolver::addWorkspaceConstraint(const Matrix& b_coeffs) {
 #ifdef BRY_ENABLE_BOUNDS_CHECK
-    ASSERT(beta_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
+    ASSERT(b_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
 #endif
-    for (bry_int_t i = 0; i < beta_coeffs.rows(); ++i) {
+    for (bry_int_t i = 0; i < b_coeffs.rows(); ++i) {
         ort::MPConstraint* row_constraint = m_solver->MakeRowConstraint(0.0, m_inf, "");
-        for (bry_int_t j = 0; j < beta_coeffs.cols(); ++j) {
-            row_constraint->SetCoefficient(m_beta[j], beta_coeffs(i, j));
+        for (bry_int_t j = 0; j < b_coeffs.cols(); ++j) {
+            row_constraint->SetCoefficient(m_b[j], b_coeffs(i, j));
         }
         // Neither eta nor gamma appear in this constraint
         row_constraint->SetCoefficient(m_eta, 0.0);
         row_constraint->SetCoefficient(m_gamma, 0.0);
     }
-    INFO("[Workspace] Added " << beta_coeffs.rows() << " constraints");
+    INFO("[Workspace] Added " << b_coeffs.rows() << " constraints");
 }
 
-void BRY::LPSolver::addInitialSetConstraint(const Matrix& beta_coeffs, const Vector& eta_coeffs) {
+void BRY::LPSolver::addInitialSetConstraint(const Matrix& b_coeffs, const Vector& eta_coeffs) {
     bry_int_t rows = eta_coeffs.size();
 #ifdef BRY_ENABLE_BOUNDS_CHECK
-    ASSERT(beta_coeffs.rows() == rows, "Number of rows in `beta_coeffs` does not match elements in `eta_coeffs`");
-    ASSERT(beta_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
+    ASSERT(b_coeffs.rows() == rows, "Number of rows in `b_coeffs` does not match elements in `eta_coeffs`");
+    ASSERT(b_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
 #endif
     for (bry_int_t i = 0; i < rows; ++i) {
         ort::MPConstraint* row_constraint = m_solver->MakeRowConstraint(0.0, m_inf, "");
-        for (bry_int_t j = 0; j < beta_coeffs.cols(); ++j) {
-            row_constraint->SetCoefficient(m_beta[j], beta_coeffs(i, j));
+        for (bry_int_t j = 0; j < b_coeffs.cols(); ++j) {
+            row_constraint->SetCoefficient(m_b[j], b_coeffs(i, j));
         }
         row_constraint->SetCoefficient(m_eta, eta_coeffs(i));
         // Gamma does not appear in this constraint
@@ -74,16 +75,16 @@ void BRY::LPSolver::addInitialSetConstraint(const Matrix& beta_coeffs, const Vec
     INFO("[Initial set] Added " << rows << " constraints");
 }
 
-void BRY::LPSolver::addUnsafeSetConstraint(const Matrix& beta_coeffs, const Vector& lower_bound) {
+void BRY::LPSolver::addUnsafeSetConstraint(const Matrix& b_coeffs, const Vector& lower_bound) {
     bry_int_t rows = lower_bound.size();
 #ifdef BRY_ENABLE_BOUNDS_CHECK
-    ASSERT(beta_coeffs.rows() == rows, "Number of rows in `beta_coeffs` does not match elements in `lower_bound`");
-    ASSERT(beta_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
+    ASSERT(b_coeffs.rows() == rows, "Number of rows in `b_coeffs` does not match elements in `lower_bound`");
+    ASSERT(b_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
 #endif
     for (bry_int_t i = 0; i < rows; ++i) {
         ort::MPConstraint* row_constraint = m_solver->MakeRowConstraint(lower_bound(i), m_inf, "");
-        for (bry_int_t j = 0; j < beta_coeffs.cols(); ++j) {
-            row_constraint->SetCoefficient(m_beta[j], beta_coeffs(i, j));
+        for (bry_int_t j = 0; j < b_coeffs.cols(); ++j) {
+            row_constraint->SetCoefficient(m_b[j], b_coeffs(i, j));
         }
         // Neither eta nor gamma appear in this constraint
         row_constraint->SetCoefficient(m_eta, 0.0);
@@ -92,17 +93,17 @@ void BRY::LPSolver::addUnsafeSetConstraint(const Matrix& beta_coeffs, const Vect
     INFO("[Unsafe set] Added " << rows << " constraints");
 }
 
-void BRY::LPSolver::addSafeSetConstraint(const Matrix& beta_coeffs, const Vector& gamma_coeffs) {
+void BRY::LPSolver::addSafeSetConstraint(const Matrix& b_coeffs, const Vector& gamma_coeffs) {
     bry_int_t rows = gamma_coeffs.size();
 #ifdef BRY_ENABLE_BOUNDS_CHECK
-    ASSERT(beta_coeffs.rows() == rows, "Number of rows in `beta_coeffs` does not match elements in `gamma_coeffs`");
-    ASSERT(beta_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
+    ASSERT(b_coeffs.rows() == rows, "Number of rows in `b_coeffs` does not match elements in `gamma_coeffs`");
+    ASSERT(b_coeffs.cols() == m_n_monoms, "Number of columns does not match number of beta monomials");
 #endif
     for (bry_int_t i = 0; i < rows; ++i) {
         ort::MPConstraint* row_constraint = m_solver->MakeRowConstraint(0.0, m_inf, "");
-        for (bry_int_t j = 0; j < beta_coeffs.cols(); ++j) {
-            row_constraint->SetCoefficient(m_beta[j], beta_coeffs(i, j));
-            //WARN("   beta coeff: " << beta_coeffs(i, j));
+        for (bry_int_t j = 0; j < b_coeffs.cols(); ++j) {
+            row_constraint->SetCoefficient(m_b[j], b_coeffs(i, j));
+            //WARN("   beta coeff: " << b_coeffs(i, j));
         }
         // Eta does not appear in this constraint
         row_constraint->SetCoefficient(m_eta, 0.0);
@@ -114,8 +115,8 @@ void BRY::LPSolver::addSafeSetConstraint(const Matrix& beta_coeffs, const Vector
 void BRY::LPSolver::setTrivialBarrierHint() {
     std::vector<std::pair<const ort::MPVariable*, double>> hint;
     hint.reserve(m_n_monoms + 2);
-    for (const ort::MPVariable* beta_i : m_beta) {
-        hint.push_back({beta_i, 1.0});
+    for (const ort::MPVariable* b_i : m_b) {
+        hint.push_back({b_i, 1.0});
     }
     hint.push_back({m_eta, 1.0});
     hint.push_back({m_gamma, 0.0});
@@ -130,8 +131,8 @@ BRY::LPSolver::Result BRY::LPSolver::solve(uint32_t time_horizon) {
     ort::MPObjective* objective = m_solver->MutableObjective();
 
     // Beta do not contribute to objective
-    for (ort::MPVariable* beta_i : m_beta)
-        objective->SetCoefficient(beta_i, 0.0);
+    for (ort::MPVariable* b_i : m_b)
+        objective->SetCoefficient(b_i, 0.0);
 
     objective->SetCoefficient(m_eta, 1.0);
     objective->SetCoefficient(m_gamma, static_cast<bry_float_t>(time_horizon));
@@ -141,7 +142,7 @@ BRY::LPSolver::Result BRY::LPSolver::solve(uint32_t time_horizon) {
 
     Vector beta_values(m_n_monoms);
     for (bry_int_t i = 0; i < m_n_monoms; ++i) {
-        beta_values(i) = m_beta[i]->solution_value();
+        beta_values(i) = m_b[i]->solution_value();
     }
 
     return Result{result_status, 1.0 - objective->Value(), m_eta->solution_value(), m_gamma->solution_value(), std::move(beta_values)};
