@@ -17,6 +17,8 @@ struct HyperRectangle {
         BRY_INL Eigen::Vector<bry_float_t, DIM> translationToUnit() const;
         BRY_INL Eigen::Vector<bry_float_t, DIM> scaleFromUnit() const;
         BRY_INL Eigen::Vector<bry_float_t, DIM> translationFromUnit() const;
+
+        std::vector<HyperRectangle<DIM>> subdivide(uint32_t integer_division = 2) const;
 };
 
 }

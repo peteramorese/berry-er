@@ -3,6 +3,7 @@
 #include "HyperRectangle.h"
 
 #include "berry/Options.h"
+#include "berry/MultiIndex.h"
 
 #include <Eigen/Core>
 
@@ -62,4 +63,22 @@ Eigen::Vector<BRY::bry_float_t, DIM> BRY::HyperRectangle<DIM>::scaleFromUnit() c
 template <std::size_t DIM>
 Eigen::Vector<BRY::bry_float_t, DIM> BRY::HyperRectangle<DIM>::translationFromUnit() const {
     return lower_bounds;
+}
+
+template <std::size_t DIM>
+std::vector<BRY::HyperRectangle<DIM>> BRY::HyperRectangle<DIM>::subdivide(uint32_t integer_division) const {
+    std::vector<BRY::HyperRectangle<DIM>> subsets;
+    subsets.reserve(pow(integer_division, DIM));
+    Eigen::Vector<bry_float_t, DIM> diff = (upper_bounds - lower_bounds) / static_cast<float>(integer_division);
+    for (auto midx = mIdx(DIM, integer_division); !midx.last(); ++midx) {
+        Eigen::Vector<bry_float_t, DIM> shift = Eigen::Vector<bry_float_t, DIM>::Zero();
+        for (std::size_t d = 0; d < DIM; ++d) {
+            shift[d] = midx[d] * diff[d];
+        }
+        BRY::HyperRectangle<DIM> subset;
+        subset.lower_bounds = lower_bounds + shift;
+        subset.upper_bounds = subset.lower_bounds + diff;
+        subsets.push_back(std::move(subset));
+    }
+    return subsets;
 }

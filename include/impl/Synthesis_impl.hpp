@@ -4,6 +4,32 @@
 
 #include "berry/BernsteinTransform.h"
 
+/* SynthesisProblem */
+
+template <std::size_t DIM>
+void BRY::SynthesisProblem<DIM>::setWorkspace(const HyperRectangle<DIM>& workspace) {
+    workspace_sets = {workspace};
+}
+
+template <std::size_t DIM>
+std::unique_ptr<BRY::SynthesisProblem<DIM>> BRY::SynthesisProblem<DIM>::makeSubdividedProblem(uint32_t subdivision) {
+    std::unique_ptr<BRY::SynthesisProblem<DIM>> subd_prob(new BRY::SynthesisProblem<DIM>());
+    auto divide = [&] (std::vector<HyperRectangle<DIM>>& subd_sets, const std::vector<HyperRectangle<DIM>>& original_sets) {
+        subd_sets.clear();
+        subd_sets.reserve(original_sets.size() * pow(subdivision, DIM));
+        for (const auto& set : original_sets) {
+            std::vector<HyperRectangle<DIM>> subd_sets_to_insert = set.subdivide(subdivision);
+            subd_sets.insert(subd_sets.end(), subd_sets_to_insert.begin(), subd_sets_to_insert.end());
+        }
+    };
+    divide(subd_prob->workspace_sets, workspace_sets);
+    divide(subd_prob->init_sets, init_sets);
+    divide(subd_prob->safe_sets, safe_sets);
+    divide(subd_prob->unsafe_sets, unsafe_sets);
+    subd_prob->time_horizon = time_horizon;
+    return subd_prob;
+}
+
 /* PolyDynamicsSynthesizer */
 
 template <std::size_t DIM>
@@ -20,50 +46,61 @@ void BRY::PolyDynamicsSynthesizer<DIM>::setProblem(const std::shared_ptr<Synthes
 }
 
 template <std::size_t DIM>
-std::pair<BRY::Matrix, BRY::Vector> BRY::PolyDynamicsSynthesizer<DIM>::getConstraintMatrices(bry_int_t degree_increase) const {
+std::pair<BRY::Matrix, BRY::Vector> BRY::PolyDynamicsSynthesizer<DIM>::getConstraintMatrices(bry_int_t degree_increase, uint32_t subdivision) const {
+    std::unique_ptr<SynthesisProblem<DIM>> subd_prob;
+    SynthesisProblem<DIM>* problem;
+    if (subdivision) {
+        subd_prob = m_problem->makeSubdividedProblem(subdivision);
+        problem = subd_prob.get();
+    } else {
+        problem = m_problem.get();
+    }
+
     Matrix Phi_m = BernsteinBasisTransform<DIM>::pwrToBernMatrix(m_barrier_deg, degree_increase);
-    Matrix Phi_inv_m = BernsteinBasisTransform<DIM>::bernToPwrMatrix(m_barrier_deg);
+
+    bry_int_t n_cols = Phi_m.cols() + 2;
 
     // Workspace
-    bry_int_t n_cols = Phi_m.cols() + 2;
-    Matrix ws_beta_coeffs = Phi_m * m_problem->workspace.transformationMatrix(m_barrier_deg) * Phi_inv_m;
-    Matrix ws_coeffs(ws_beta_coeffs.rows(), n_cols);
-    //           beta            eta                                           gamma
-    ws_coeffs << ws_beta_coeffs, Vector::Zero(ws_beta_coeffs.rows()), Vector::Zero(ws_beta_coeffs.rows());
-    Vector ws_lower_bound = Vector::Zero(ws_beta_coeffs.rows());
+    if (problem->workspace_sets.empty())
+        WARN("No workspace was provided");
+    Matrix ws_coeffs(problem->workspace_sets.size() * Phi_m.rows(), n_cols);
+    Vector ws_lower_bound = Vector::Zero(ws_coeffs.rows());
+    bry_int_t i = 0;
+    for (const HyperRectangle<DIM>& set : problem->workspace_sets) {
+        Matrix beta_coeffs = Phi_m * set.transformationMatrix(m_barrier_deg);
+        Matrix coeffs(beta_coeffs.rows(), n_cols);
+        coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
+        ws_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
+    }
 
     // Initial sets
-    if (m_problem->init_sets.empty())
+    if (problem->init_sets.empty())
         WARN("No initial sets were provided");
-    Matrix init_coeffs(m_problem->init_sets.size() * Phi_m.rows(), n_cols);
+    Matrix init_coeffs(problem->init_sets.size() * Phi_m.rows(), n_cols);
     Vector init_lower_bound = Vector::Zero(init_coeffs.rows());
-    bry_int_t i = 0;
-    for (const HyperRectangle<DIM>& set : m_problem->init_sets) {
-        Matrix beta_coeffs = -Phi_m * set.transformationMatrix(m_barrier_deg) * Phi_inv_m;
-        //DEBUG("init beta coeffs \n" << beta_coeffs);
+    i = 0;
+    for (const HyperRectangle<DIM>& set : problem->init_sets) {
+        Matrix beta_coeffs = -Phi_m * set.transformationMatrix(m_barrier_deg);
         Matrix coeffs(beta_coeffs.rows(), n_cols);
-        //        beta         eta                                        gamma
         coeffs << beta_coeffs, Vector::Ones(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
         init_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
     }
 
     // Unsafe sets
-    if (m_problem->unsafe_sets.empty())
+    if (problem->unsafe_sets.empty())
         WARN("No unsafe sets were provided");
-    Matrix unsafe_coeffs(m_problem->unsafe_sets.size() * Phi_m.rows(), n_cols);
+    Matrix unsafe_coeffs(problem->unsafe_sets.size() * Phi_m.rows(), n_cols);
     Vector unsafe_lower_bound = Vector::Ones(unsafe_coeffs.rows());
     i = 0;
-    for (const HyperRectangle<DIM>& set : m_problem->unsafe_sets) {
-        Matrix beta_coeffs = Phi_m * set.transformationMatrix(m_barrier_deg) * Phi_inv_m;
-        //DEBUG("unsafe beta coeffs \n" << beta_coeffs);
+    for (const HyperRectangle<DIM>& set : problem->unsafe_sets) {
+        Matrix beta_coeffs = Phi_m * set.transformationMatrix(m_barrier_deg);
         Matrix coeffs(beta_coeffs.rows(), n_cols);
-        //        beta         eta                                        gamma
         coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
         unsafe_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
     }
 
     // Safe sets
-    if (m_problem->safe_sets.empty())
+    if (problem->safe_sets.empty())
         WARN("No safe sets were provided");
     Matrix F_expec_Gamma = m_dynamics->dynamicsPowerMatrix(m_barrier_deg) * m_noise->additiveNoiseMatrix(m_barrier_deg);
     bry_int_t p = m_dynamics->composedDegree(m_barrier_deg);
@@ -71,16 +108,14 @@ std::pair<BRY::Matrix, BRY::Vector> BRY::PolyDynamicsSynthesizer<DIM>::getConstr
     Vector gamma_coeffs = Vector::Ones(Phi_p.cols());
     ASSERT(F_expec_Gamma.rows() == Phi_p.cols(), "Dimension mismatch between F and Phi (p)");
 
-    Matrix safe_coeffs(m_problem->safe_sets.size() * Phi_p.rows(), n_cols);
+    Matrix safe_coeffs(problem->safe_sets.size() * Phi_p.rows(), n_cols);
     Vector safe_lower_bound = Vector::Zero(safe_coeffs.rows());
     i = 0;
-    for (const HyperRectangle<DIM>& set : m_problem->safe_sets) {
+    for (const HyperRectangle<DIM>& set : problem->safe_sets) {
         Matrix beta_coeffs = 
-            -Phi_p * set.transformationMatrix(p) * (F_expec_Gamma - Matrix::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) * Phi_inv_m;
+            -Phi_p * set.transformationMatrix(p) * (F_expec_Gamma - Matrix::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols()));
         
-        //DEBUG("safe beta coeffs \n" << beta_coeffs);
         Matrix coeffs(beta_coeffs.rows(), n_cols);
-        //        beta         eta                                        gamma
         coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Ones(beta_coeffs.rows());
         safe_coeffs.block(Phi_p.rows() * i++, 0, Phi_p.rows(), n_cols) = coeffs;
     }
@@ -94,59 +129,56 @@ std::pair<BRY::Matrix, BRY::Vector> BRY::PolyDynamicsSynthesizer<DIM>::getConstr
 }
 
 template <std::size_t DIM>
-void BRY::PolyDynamicsSynthesizer<DIM>::initialize(bry_int_t degree_increase) {
+void BRY::PolyDynamicsSynthesizer<DIM>::initialize(bry_int_t degree_increase, uint32_t subdivision) {
+    std::unique_ptr<SynthesisProblem<DIM>> subd_prob;
+    SynthesisProblem<DIM>* problem;
+    if (subdivision) {
+        subd_prob = m_problem->makeSubdividedProblem(subdivision);
+        problem = subd_prob.get();
+    } else {
+        problem = m_problem.get();
+    }
+
     Matrix Phi_m = BernsteinBasisTransform<DIM>::pwrToBernMatrix(m_barrier_deg, degree_increase);
     Matrix Phi_inv_m = BernsteinBasisTransform<DIM>::bernToPwrMatrix(m_barrier_deg);
-    //DEBUG("Phi inv m: \n" << Phi_inv_m);
-    //DEBUG("Phi m: \n" << Phi_m);
 
     // Workspace
-    {
-        Matrix beta_coeffs = Phi_m * m_problem->workspace.transformationMatrix(m_barrier_deg) * Phi_inv_m;
-        m_solver->setWorkspaceConstraint(beta_coeffs);
+    for (HyperRectangle<DIM> set : problem->workspace_sets) {
+        Matrix beta_coeffs = Phi_m * set.transformationMatrix(m_barrier_deg) * Phi_inv_m;
+        m_solver->addWorkspaceConstraint(beta_coeffs);
     }
 
     // Initial sets
-    if (m_problem->init_sets.empty())
+    if (problem->init_sets.empty())
         WARN("No initial sets were provided");
     Vector eta_coeffs = Vector::Ones(Phi_m.rows());
-    for (const HyperRectangle<DIM>& set : m_problem->init_sets) {
+    for (const HyperRectangle<DIM>& set : problem->init_sets) {
         Matrix beta_coeffs = -Phi_m * set.transformationMatrix(m_barrier_deg) * Phi_inv_m;
         m_solver->addInitialSetConstraint(beta_coeffs, eta_coeffs);
     }
 
     // Unsafe sets
-    if (m_problem->unsafe_sets.empty())
+    if (problem->unsafe_sets.empty())
         WARN("No unsafe sets were provided");
     Vector lower_bound = Vector::Ones(Phi_m.rows());
-    for (const HyperRectangle<DIM>& set : m_problem->unsafe_sets) {
+    for (const HyperRectangle<DIM>& set : problem->unsafe_sets) {
         Matrix beta_coeffs = Phi_m * set.transformationMatrix(m_barrier_deg) * Phi_inv_m;
         m_solver->addUnsafeSetConstraint(beta_coeffs, lower_bound);
     }
 
     // Safe sets
-    if (m_problem->safe_sets.empty())
+    if (problem->safe_sets.empty())
         WARN("No safe sets were provided");
     Matrix F_expec_Gamma = m_dynamics->dynamicsPowerMatrix(m_barrier_deg) * m_noise->additiveNoiseMatrix(m_barrier_deg);
-    //DEBUG("F \n" << m_dynamics->dynamicsPowerMatrix(m_barrier_deg));
-    //DEBUG("F expec Gamma: \n" << F_expec_Gamma);
     bry_int_t p = m_dynamics->composedDegree(m_barrier_deg);
     Matrix Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(p, degree_increase);
-    //Vector gamma_coeffs = Phi_inv_p * Vector::Ones(Phi_inv_p.cols());
     Vector gamma_coeffs = Vector::Ones(Phi_p.rows());
     ASSERT(F_expec_Gamma.rows() == Phi_p.cols(), "Dimension mismatch between F and Phi (p)");
 
-    for (const HyperRectangle<DIM>& set : m_problem->safe_sets) {
-        //Matrix beta_coeffs = 
-        //    -Phi_p * (F_expec_Gamma - Matrix::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) 
-        //    * set.transformationMatrix(m_barrier_deg) * Phi_inv_m;
-
+    for (const HyperRectangle<DIM>& set : problem->safe_sets) {
         Matrix beta_coeffs = 
             -Phi_p * set.transformationMatrix(p) * (F_expec_Gamma - Matrix::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) * Phi_inv_m;
 
-        //DEBUG("Safe set beta coeffs: \n" << beta_coeffs);
-        //DEBUG("transformation matrix: \n" << set.transformationMatrix(m_barrier_deg));
-        //DEBUG("matrix: \n" << (F_expec_Gamma - Matrix::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols())) * set.transformationMatrix(m_barrier_deg));
         m_solver->addSafeSetConstraint(beta_coeffs, gamma_coeffs);
     }
     
@@ -179,6 +211,6 @@ BRY::SynthesisSolution<DIM> BRY::PolyDynamicsSynthesizer<DIM>::synthesize() {
     // TODO
     solution.success = true;
 
-    solution.certificate.reset(new Polynomial<DIM, Basis::Bernstein>(solver_result.beta_values));
+    solution.certificate.reset(new Polynomial<DIM, Basis::Bernstein>(solver_result.b_values));
     return solution;
 }

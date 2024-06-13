@@ -6,15 +6,15 @@ function visPolynomial2(coeffs, ws_bounds)
     coeffs = reshape(coeffs, deg, deg);
     
     % Evaluate the 2D polynomial
-    z = polyval2(coeffs, x, y, 10);
+    z = polyval2(coeffs, x, y, 5);
     
     % Plot the 2D polynomial
     surf(x, y, z);
-    xlabel('x');
-    ylabel('y');
-    zlabel('z');
-    title('Visualization of 2D Polynomial');
-    colormap(jet); 
+    xlabel('x_1');
+    ylabel('x_2');
+    zlabel('B(x)');
+    % title('Visualization of 2D Polynomial');
+    colormap("parula"); 
     % colorbar; % Add a colorbar to show the scale
 end
 

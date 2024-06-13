@@ -42,8 +42,10 @@ int main() {
 
     std::shared_ptr<SynthesisProblem<DIM>> prob(new SynthesisProblem<DIM>());
 
-    prob->workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-0.1, -0.1);
-    prob->workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(1.0, 1.0);
+    HyperRectangle<DIM> workspace;
+    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-0.1, -0.1);
+    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(1.0, 1.0);
+    prob->setWorkspace(workspace);
 
     // Init set
     HyperRectangle<DIM> init_set;

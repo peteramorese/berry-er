@@ -20,8 +20,6 @@ int main() {
         }
         std::cout << std::endl;
     };
-    DEBUG("double: " << sizeof(double));
-    DEBUG("long double: " << sizeof(long double));
 
     constexpr std::size_t DIM = 1;
     std::shared_ptr<PolynomialDynamics<DIM>> dynamics_ptr = std::make_shared<PolynomialDynamics<1>>(1);    

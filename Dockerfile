@@ -41,6 +41,17 @@ RUN cmake --build build --config Release --target install -v
 #RUN make
 #RUN make install
 
+ENV GUROBI_HOME=/opt/gurobi1102/linux64
+ENV PATH=$GUROBI_HOME/bin:$PATH
+ENV LD_LIBRARY_PATH=$GUROBI_HOME/lib:$LD_LIBRARY_PATH
+ENV GRB_LICENSE_FILE=/root/berry-er/license_files/gurobi.lic
+ENV MOSEKLM_LICENSE_FILE=/root/berry-er/license_files/mosek.lic
+
+RUN wget https://packages.gurobi.com/11.0/gurobi11.0.2_linux64.tar.gz && \
+    tar -xvzf gurobi11.0.2_linux64.tar.gz && \
+    rm gurobi11.0.2_linux64.tar.gz && \
+    mv gurobi1102 /opt/
+
 
 WORKDIR /root/berry-er
 
