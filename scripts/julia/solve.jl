@@ -24,10 +24,11 @@ function solve_linear_program(A::Matrix{Float64}, b::Vector{Float64}, N::Int)
     #model = Model(GLPK.Optimizer)
     model = Model(optimizer_with_attributes(Mosek.Optimizer))
 
-    set_optimizer_attribute(model, "MSK_DPAR_INTPNT_TOL_PFEAS", 1e-8)  # Primal feasibility tolerance
-    set_optimizer_attribute(model, "MSK_DPAR_INTPNT_TOL_DFEAS", 1e-8)  # Dual feasibility tolerance
-    set_optimizer_attribute(model, "MSK_DPAR_INTPNT_TOL_INFEAS", 1e-8)  # Infeasibility
-    set_optimizer_attribute(model, "MSK_DPAR_INTPNT_TOL_REL_GAP", 1e-8)  # Relative gap tolerance
+    tolerance = 1e-4
+    set_optimizer_attribute(model, "MSK_DPAR_INTPNT_TOL_PFEAS", tolerance)  # Primal feasibility tolerance
+    set_optimizer_attribute(model, "MSK_DPAR_INTPNT_TOL_DFEAS", tolerance)  # Dual feasibility tolerance
+    set_optimizer_attribute(model, "MSK_DPAR_INTPNT_TOL_INFEAS", tolerance)  # Infeasibility
+    set_optimizer_attribute(model, "MSK_DPAR_INTPNT_TOL_REL_GAP", tolerance)  # Relative gap tolerance
 
     @variable(model, x[1:cols] >= 0)
     for i in 1:rows

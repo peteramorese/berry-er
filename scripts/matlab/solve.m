@@ -23,17 +23,17 @@ objective_vec = zeros(size(A,2), 1);
 objective_vec(end - 1) = 1.0;
 objective_vec(end) = N;
 tic
-6
-% % options = optimoptions('linprog', 'Algorithm', 'interior-point');
-% options = optimoptions('linprog', ...
-%     'Algorithm', 'interior-point', ...
-%     'OptimalityTolerance', 1e-6, ... % Optimality tolerance
-%     'ConstraintTolerance', 1e-10);%, ... % Constraint tolerance (feasibility tolerance)
-%     % 'Display', 'iter');              % Display iteration information
-% 
-% vars = linprog(objective_vec, -A, -b, [], [], [], [], options);
 
-vars = linprog(objective_vec, -A, -b);
+% % options = optimoptions('linprog', 'Algorithm', 'interior-point');
+options = optimoptions('linprog', ...
+    'Algorithm', 'interior-point', ...
+    'OptimalityTolerance', 1e-4, ... % Optimality tolerance
+    'ConstraintTolerance', 1e-8);%, ... % Constraint tolerance (feasibility tolerance)
+    % 'Display', 'iter');              % Display iteration information
+
+vars = linprog(objective_vec, -A, -b, [], [], [], [], options);
+
+% vars = linprog(objective_vec, -A, -b);
 
 t = toc;
 fprintf("Time: %.3f\n", t)
