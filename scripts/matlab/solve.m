@@ -9,7 +9,7 @@ file_directory = "../../build/bin/";
 
 A = readMatrixFromFile(file_directory + "A.txt");
 b = readMatrixFromFile(file_directory + "b.txt");
-Phi_inv = readMatrixFromFile(file_directory + "Phi_inv.txt");
+% Phi_inv = readMatrixFromFile(file_directory + "Phi_inv.txt");
 
 b = [b; 0; 0];
 gamma_cond = zeros(1, size(A,2));

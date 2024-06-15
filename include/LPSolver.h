@@ -33,6 +33,8 @@ class LPSolver {
         /// @param n_monoms Number of monomials in barrier
         LPSolver(const std::string& solver_id, bry_int_t n_monoms);
 
+        void setConstraintMatrices(const Matrix& A, const Vector& b);
+
         /// @brief Set the constraint for non-negativity over the workspace (B(x) >= 0)
         /// @param b_coeffs Coefficient matrix for b vector
         void addWorkspaceConstraint(const Matrix& b_coeffs);

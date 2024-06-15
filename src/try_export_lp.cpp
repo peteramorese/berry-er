@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
     bool print_coeffs = parser.parse<void>("print-coeffs", 'c', "Print coeffs").has();
     bool solve = parser.parse<void>('r', "Solve the synthesis problem").has();
     bool non_convex = parser.parse<void>("non-conv", "Solve the non-convex synthesis problem (default to convex)").has();
+    bool diag_deg = parser.parse<void>("diag-deg", "Use the diagonal polynomial degree definition").has();
 	auto solver_id = parser.parse<std::string>("s-id", 's', "SCIP", "Solver ID");
 	auto barrier_deg = parser.parse<bry_int_t>("deg", 'd', 4l, "Barrier degree");
 	auto deg_increase = parser.parse<bry_int_t>("deg-inc", 'i', 0l, "Barrier degree increase");
@@ -238,6 +239,10 @@ int main(int argc, char** argv) {
     Matrix b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(barrier_deg.get());
 
     auto[A, b] = synthesizer.getConstraintMatrices(deg_increase.get(), subd.get());
+    if (diag_deg) {
+        INFO("Converting constraint matrix to diagonal degree");
+        synthesizer.constraintMatrixToDiagDeg(A);
+    }
     if (verbose) {
         INFO("A: \n" << A);
         NEW_LINE;

@@ -51,6 +51,8 @@ class PolyDynamicsSynthesizer {
         /// @return Pair: {A, b} where Ax >= b
         std::pair<Matrix, Vector> getConstraintMatrices(bry_int_t degree_increase = 0, uint32_t subdivision = 0) const;
 
+        void constraintMatrixToDiagDeg(Matrix& A);
+
         /// @brief Set a time limit for the solver
         /// @param time_limit_ms Time limit in milliseconds
         void setTimeLimit(int64_t time_limit_ms);

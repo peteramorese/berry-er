@@ -129,6 +129,25 @@ std::pair<BRY::Matrix, BRY::Vector> BRY::PolyDynamicsSynthesizer<DIM>::getConstr
 }
 
 template <std::size_t DIM>
+void BRY::PolyDynamicsSynthesizer<DIM>::constraintMatrixToDiagDeg(Matrix& A) {
+
+    auto removeCol = [](Eigen::MatrixXd& m, int col) {
+        Eigen::MatrixXd new_m(m.rows(), m.cols() - 1);
+        new_m << m.leftCols(col), m.rightCols(m.cols() - col - 1);
+        m = new_m;
+    };
+
+    bry_int_t cols_removed = 0;
+
+    for (auto col_midx = mIdxW(DIM, m_barrier_deg + 1); !col_midx.last(); ++col_midx) {
+        if (std::accumulate(col_midx.begin(), col_midx.end(), 0) > m_barrier_deg) {
+            removeCol(A, col_midx.inc().wrappedIdx() - cols_removed++);
+        }
+    }
+}
+
+
+template <std::size_t DIM>
 void BRY::PolyDynamicsSynthesizer<DIM>::initialize(bry_int_t degree_increase, uint32_t subdivision) {
     std::unique_ptr<SynthesisProblem<DIM>> subd_prob;
     SynthesisProblem<DIM>* problem;
