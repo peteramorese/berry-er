@@ -40,7 +40,6 @@ int main(int argc, char** argv) {
 
 	ArgParser parser(argc, argv);
     bool verbose = parser.parse<void>('v', "Verbose").has();
-    bool print_coeffs = parser.parse<void>("print-coeffs", 'c', "Print coeffs").has();
     bool solve = parser.parse<void>('r', "Solve the synthesis problem").has();
     bool non_convex = parser.parse<void>("non-conv", "Solve the non-convex synthesis problem (default to convex)").has();
     bool diag_deg = parser.parse<void>("diag-deg", "Use the diagonal polynomial degree definition").has();
@@ -110,11 +109,6 @@ int main(int argc, char** argv) {
 
     Eigen::Vector<bry_float_t, DIM> boundary_width{0.2, 0.2};
 
-    HyperRectangle<DIM> workspace;
-    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-1.0, -0.5) - boundary_width;
-    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.5, 0.5) + boundary_width;
-    prob->setWorkspace(workspace);
-
     auto printSetBounds = [](const HyperRectangle<DIM>& set) {
         DEBUG("Set bounds: [" 
             << set.lower_bounds(0) << ", " 
@@ -122,6 +116,14 @@ int main(int argc, char** argv) {
             << set.lower_bounds(1) << ", " 
             << set.upper_bounds(1) << "]");
     };
+
+
+    HyperRectangle<DIM> workspace;
+    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-1.0, -0.5) - boundary_width;
+    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.5, 0.5) + boundary_width;
+    prob->setWorkspace(workspace);
+    DEBUG("Workspace set:");
+    printSetBounds(workspace);
 
     // Init set
     HyperRectangle<DIM> init_set;
@@ -133,11 +135,6 @@ int main(int argc, char** argv) {
     DEBUG("Init set:");
     printSetBounds(init_set);
     
-    DEBUG("Init set partitions:");
-    auto init_set_sbd = init_set.subdivide(subd.get());
-    for (auto set : init_set_sbd) {
-        printSetBounds(set);
-    }
     NEW_LINE;
 
     DEBUG("Unsafe sets:");
@@ -251,12 +248,14 @@ int main(int argc, char** argv) {
     INFO("Exporting...");
     writeMatrixToFile(A, "A.txt");
     writeMatrixToFile(b, "b.txt");
-    writeMatrixToFile(b_to_p, "Phi_inv.txt");
     INFO("Done!");
-    writeMatrixToFile(A, "A.txt");
     if (solve) {
         INFO("Solving...");
-        synthesizer.initialize(deg_increase.get(), subd.get());
+        synthesizer.setConstraints(A, b);
+        //} else {
+        //    WARN("Not using matrix constraints (may have slower performance)");
+        //    synthesizer.setConstraints(deg_increase.get(), subd.get());
+        //}
         
         Timer t("synthesis");
         auto result = synthesizer.synthesize();
@@ -265,22 +264,9 @@ int main(int argc, char** argv) {
         INFO("Probability of safety: " << result.p_safe);
         INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
 
-        auto certificate_power = transform(*result.certificate, b_to_p);
-
-        //INFO("Barrier: " << certificate_power);
-        //NEW_LINE;
-
-        if (print_coeffs) {
-            INFO("Coefficients:");
-            for (std::size_t i = 0; i < certificate_power.tensor().size(); ++i) {
-                if (i < certificate_power.tensor().size() - 1) {
-                    std::cout << std::fixed << std::setprecision(20) << certificate_power.tensor()(i) << ", ";
-                } else {
-                    std::cout << std::fixed << std::setprecision(20) << certificate_power.tensor()(i) << std::endl;
-                }
-            }
-        }
-
+        Vector certificate_coeffs = diag_deg ? synthesizer.certificateDiagDegToSquare(result.b_values) : result.b_values;
+        DEBUG("Certificate: " << Polynomial<DIM>(certificate_coeffs));
+        writeMatrixToFile(certificate_coeffs, "certificate_coeffs.txt");
     }
 
 

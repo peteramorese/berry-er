@@ -114,28 +114,11 @@ int main() {
 
     synthesizer.setProblem(prob);
 
-    synthesizer.initialize();
+    synthesizer.setConstraints();
     auto result = synthesizer.synthesize();
     
     INFO("Probability of safety: " << result.p_safe);
     INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
-
-    Matrix b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(deg);
-    auto certificate_power = transform(*result.certificate, b_to_p);
-
-    INFO("Barrier: " << certificate_power);
-    for (std::size_t i = 0; i < certificate_power.tensor().size(); ++i) {
-        if (i < certificate_power.tensor().size() - 1) {
-            std::cout << std::fixed << std::setprecision(20) << certificate_power.tensor()(i) << ", ";
-        } else {
-            std::cout << std::fixed << std::setprecision(20) << certificate_power.tensor()(i) << std::endl;
-        }
-    }
-
-
-    
-
-
 
     //PolynomialDynamics<2> dynamics(1, 1);    
     //dynamics[0].coeff(0, 0) = 5;

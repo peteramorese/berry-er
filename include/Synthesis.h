@@ -11,69 +11,82 @@
 namespace BRY {
 
 template <std::size_t DIM>
-struct SynthesisProblem {
+struct ConstraintMatrices {
+    ConstraintMatrices(bry_int_t n_constraints, bry_int_t n_vars, bry_int_t barrier_deg, bool diag_deg);
+    ConstraintMatrices() = delete;
+
+    /// @brief Constraint matrix `A` in `Ax >= b` where columns represent variables [b_0, ..., b_m, eta, gamma]
+    Matrix A;
+
+    /// @brief Lower bound vector `b` in `Ax >= b`
+    Vector b;
+
+    /// @brief Degree definition of barrier
+    BRY_INL bool diagDeg() const {return m_diag_deg;}
+
+    void toDiagonalDegree();
+
+    private:
+        const bry_int_t m_barrier_deg;
+        bool m_diag_deg;
+};
+
+template <std::size_t DIM>
+struct PolyDynamicsProblem {
+
+    /// @brief Dynamics
+    std::shared_ptr<PolynomialDynamics<DIM>> dynamics;
+
+    /// @brief Noise
+    std::shared_ptr<Additive2ndMomentNoise<DIM>> noise;
+
+    /* Set definitions */
     std::vector<HyperRectangle<DIM>> workspace_sets = {HyperRectangle<DIM>()};
     std::vector<HyperRectangle<DIM>> init_sets;
     std::vector<HyperRectangle<DIM>> safe_sets;
     std::vector<HyperRectangle<DIM>> unsafe_sets;
+
+    /// @brief Number of time steps to verify the system for
     uint32_t time_horizon;
-    
-    void setWorkspace(const HyperRectangle<DIM>& workspace);
-    std::unique_ptr<SynthesisProblem<DIM>> makeSubdividedProblem(uint32_t subdivision);
-};
 
-template <std::size_t DIM>
-struct SynthesisSolution {
-    bool success = false;
+    /// @brief Degree of the barrier certificate
+    bry_int_t barrier_deg = 3;
 
-    /// @brief Probability of safety
-    bry_float_t p_safe = 0.0;
+    /// @brief Increase the degree of the power-Bernstein conversion to reduce the conservativeness
+    bry_int_t degree_increase = 0;
 
-    /// @brief eta (init set constraint) and gamma (expected increase constraint)
-    bry_float_t eta = 0.0; 
-    bry_float_t gamma = 0.0;
+    /// @brief Use the diagonal degree definition of the certificate
+    bool diag_deg;
 
-    /// @brief Bernstein polynomial barrier certificate
-    std::unique_ptr<Polynomial<DIM, Basis::Bernstein>> certificate = nullptr;
-};
-
-template <std::size_t DIM>
-class PolyDynamicsSynthesizer {
     public:
-        PolyDynamicsSynthesizer(const std::shared_ptr<PolynomialDynamics<DIM>>& dynamics, 
-                                const std::shared_ptr<Additive2ndMomentNoise<DIM>>& noise, 
-                                bry_int_t barrier_deg,
-                                const std::string& solver_id = "SCIP");
+        /// @brief Helper for setting the workspace from a single set
+        /// @param workspace Hyper-rectangle workspace
+        void setWorkspace(const HyperRectangle<DIM>& workspace);
 
-        void setProblem(const std::shared_ptr<SynthesisProblem<DIM>>& problem);
+        /// @brief Subdivide the problem for less conservativeness
+        /// @param subdivision Integer number of subdivisions along one dimension
+        void subdivide(uint32_t subdivision);
 
-        /// @brief Get the linear program matrices
-        /// @return Pair: {A, b} where Ax >= b
-        std::pair<Matrix, Vector> getConstraintMatrices(bry_int_t degree_increase = 0, uint32_t subdivision = 0) const;
+        /// @brief Compute the constraint matrices
+        /// @return 
+        const ConstraintMatrices getConstraintMatrices() const;
+};
 
-        void constraintMatrixToDiagDeg(Matrix& A);
+template <std::size_t DIM>
+struct SynthesisSolution : public LPSolver::Result {
+    SynthesisSolution(bool diag_deg) : m_diag_deg(diag_deg) {}
 
-        /// @brief Set a time limit for the solver
-        /// @param time_limit_ms Time limit in milliseconds
-        void setTimeLimit(int64_t time_limit_ms);
+    /// @brief Degree definition of barrier
+    BRY_INL bool diagDeg() const {return m_diag_deg;}
 
-        /// @brief Initialize the synthesizer
-        /// @param degree_increase Decrease the conservativeness by increasing the number constraints
-        /// @param subdivision Decrease the conservativeness by subdividing
-        void initialize(bry_int_t degree_increase = 0, uint32_t subdivision = 0);
-
-        SynthesisSolution<DIM> synthesize();
+    void fromDiagonalDegree();
 
     private:
-        std::shared_ptr<PolynomialDynamics<DIM>> m_dynamics;
-        std::shared_ptr<Additive2ndMomentNoise<DIM>> m_noise;
-        std::unique_ptr<LPSolver> m_solver;
-        bry_int_t m_barrier_deg;
-
-        bool m_initialized = false;
-
-        std::shared_ptr<SynthesisProblem<DIM>> m_problem;
+        bool m_diag_deg;
 };
+
+template <std::size_t DIM>
+SynthesisSolution<DIM> synthesize(const PolyDynamicsProblem<DIM>& problem, bry_int_t barrier_deg, const std::string& solver_id = "clp");
 
 }
 
