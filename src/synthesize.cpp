@@ -3,7 +3,6 @@
 #include "HyperRectangle.h"
 #include "Synthesis.h"
 #include "ArgParser.h"
-#include "Time.h"
 
 #include <iostream>
 #include <fstream>
@@ -12,27 +11,6 @@
 #include <Eigen/Dense>
 
 using namespace BRY;
-
-void writeMatrixToFile(const Matrix& matrix, const std::string& filename) {
-    std::ofstream file(filename);
-    if (file.is_open()) {
-        // Write matrix dimensions
-        file << matrix.rows() << " " << matrix.cols() << std::endl;
-
-        // Write matrix data
-        for (int i = 0; i < matrix.rows(); ++i) {
-            for (int j = 0; j < matrix.cols(); ++j) {
-                file << std::fixed << std::setprecision(40) << matrix(i, j);
-                if (j < matrix.cols() - 1) file << " ";
-            }
-            file << std::endl;
-        }
-
-        file.close();
-    } else {
-        std::cerr << "Unable to open file";
-    }
-}
 
 //#define SIMPLE_PROBLEM
 
@@ -87,8 +65,11 @@ int main(int argc, char** argv) {
     prob->safe_sets.push_back(std::move(safe_set));
 #else
     constexpr std::size_t DIM = 2;
-    std::shared_ptr<PolynomialDynamics<DIM>> dynamics_ptr = std::make_shared<PolynomialDynamics<DIM>>(1, 1);    
-    PolynomialDynamics<DIM>& dynamics = *dynamics_ptr;
+
+    std::shared_ptr<PolyDynamicsProblem<DIM>> prob(new PolyDynamicsProblem<DIM>());
+
+    prob->dynamics.reset(new PolynomialDynamics<DIM>(1, 1));
+    PolynomialDynamics<DIM>& dynamics = *prob->dynamics;
     dynamics[0].coeff(0, 0) = 0.0;
     dynamics[0].coeff(1, 0) = 0.5;
     dynamics[0].coeff(0, 1) = 0.0;
@@ -103,9 +84,7 @@ int main(int argc, char** argv) {
     cov(1, 0) = 0.00;
     cov(0, 1) = 0.00;
     cov(1, 1) = 0.01;
-    std::shared_ptr<Additive2ndMomentNoise<DIM>> noise_ptr = std::make_shared<Additive2ndMomentNoise<DIM>>(cov);
-
-    std::shared_ptr<SynthesisProblem<DIM>> prob(new SynthesisProblem<DIM>());
+    prob->noise.reset(new Additive2ndMomentNoise<DIM>(cov));
 
     Eigen::Vector<bry_float_t, DIM> boundary_width{0.2, 0.2};
 
@@ -228,45 +207,37 @@ int main(int argc, char** argv) {
     }
 #endif
 
-    PolyDynamicsSynthesizer synthesizer(dynamics_ptr, noise_ptr, barrier_deg.get(), solver_id.get());
-
     prob->time_horizon = time_steps.get();
-    synthesizer.setProblem(prob);
+    prob->barrier_deg = barrier_deg.get();
+    prob->degree_increase = deg_increase.get();
+    prob->diag_deg = diag_deg;
 
-    Matrix b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(barrier_deg.get());
+    if (subd.has()) {
+        INFO("Subdividing in " << subd.get());
+        prob->subdivide(subd.get());
+    }
 
-    auto[A, b] = synthesizer.getConstraintMatrices(deg_increase.get(), subd.get());
-    if (diag_deg) {
-        INFO("Converting constraint matrix to diagonal degree");
-        synthesizer.constraintMatrixToDiagDeg(A);
-    }
-    if (verbose) {
-        INFO("A: \n" << A);
-        NEW_LINE;
-        INFO("b: \n" << b.transpose());
-    }
-    INFO("Exporting...");
-    writeMatrixToFile(A, "A.txt");
-    writeMatrixToFile(b, "b.txt");
+    ConstraintMatrices<DIM> constraints = prob->getConstraintMatrices();
+
+    INFO("Exporting constraint matrices...");
+    writeMatrixToFile(constraints.A, "A.txt");
+    writeMatrixToFile(constraints.b, "b.txt");
     INFO("Done!");
+
     if (solve) {
         INFO("Solving...");
-        synthesizer.setConstraints(A, b);
-        //} else {
-        //    WARN("Not using matrix constraints (may have slower performance)");
-        //    synthesizer.setConstraints(deg_increase.get(), subd.get());
-        //}
         
-        Timer t("synthesis");
-        auto result = synthesizer.synthesize();
-        INFO("Done! (" << t.now(TimeUnit::s) << "s)");
-        
+        auto result = synthesize(constraints, prob->time_horizon, solver_id.get());
+        INFO("Done!");
+        NEW_LINE;
         INFO("Probability of safety: " << result.p_safe);
         INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
+        INFO("Computation time: " << result.comp_time << "s");
 
-        Vector certificate_coeffs = diag_deg ? synthesizer.certificateDiagDegToSquare(result.b_values) : result.b_values;
-        DEBUG("Certificate: " << Polynomial<DIM>(certificate_coeffs));
-        writeMatrixToFile(certificate_coeffs, "certificate_coeffs.txt");
+        if (result.diagDeg())
+            result.fromDiagonalDegree();
+
+        writeMatrixToFile(result.b_values, "certificate_coeffs.txt");
     }
 
 

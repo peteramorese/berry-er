@@ -2,6 +2,8 @@
 
 #include "LPSolver.h"
 
+#include "Time.h"
+
 #include "berry/Options.h"
 
 #include <ortools/linear_solver/linear_solver.pb.h>
@@ -25,12 +27,16 @@ void BRY::LPSolver::setConstraintMatrices(const Matrix& A, const Vector& b) {
         return;
     }
 #ifdef BRY_ENABLE_BOUNDS_CHECK
-    ASSERT(A.cols() == nMonoms() + 2, "Number of columns does not match number of variables");
     ASSERT(A.rows() == b.size(), "Number of rows in `A` does not match size of `b`");
 #endif
 
     INFO("Constructing LP with " << A.cols() << " variables");
     m_solver->MakeNumVarArray(A.cols() - 2, -m_inf, m_inf, "b", &m_b);
+
+#ifdef BRY_ENABLE_BOUNDS_CHECK
+    ASSERT(A.cols() == nMonoms() + 2, "Number of columns does not match number of variables");
+#endif
+
     m_eta = m_solver->MakeNumVar(0.0, m_inf, "eta");
     m_gamma = m_solver->MakeNumVar(0.0, m_inf, "gamma");
 
@@ -73,6 +79,7 @@ BRY::LPSolver::Result BRY::LPSolver::solve(uint32_t time_horizon) {
     objective->SetCoefficient(m_gamma, static_cast<bry_float_t>(time_horizon));
     objective->SetMinimization();
 
+    Timer t("synthesis");
     const ort::MPSolver::ResultStatus result_status = m_solver->Solve();
 
     Vector beta_values(nMonoms());
@@ -80,5 +87,5 @@ BRY::LPSolver::Result BRY::LPSolver::solve(uint32_t time_horizon) {
         beta_values(i) = m_b[i]->solution_value();
     }
 
-    return Result{result_status, 1.0 - objective->Value(), m_eta->solution_value(), m_gamma->solution_value(), std::move(beta_values)};
+    return Result{result_status, 1.0 - objective->Value(), m_eta->solution_value(), m_gamma->solution_value(), std::move(beta_values), t.now(TimeUnit::s)};
 }

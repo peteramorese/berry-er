@@ -1,11 +1,13 @@
-clear; close all; clc;
+clear; close all;
+
+file_directory = "../../build/bin/";
 
 N = 10;
 d = 2;
 % ws_bounds = [0, 1, 0, 1];
 ws_bounds = [-1.2, .7, -.7, .7];
 
-file_directory = "../../build/bin/";
+
 
 A = readMatrixFromFile(file_directory + "A.txt");
 b = readMatrixFromFile(file_directory + "b.txt");

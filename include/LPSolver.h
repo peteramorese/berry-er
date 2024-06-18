@@ -25,6 +25,8 @@ class LPSolver {
 
             /// @brief Optimal barrier coefficients
             Vector b_values;
+
+            double comp_time;
         };
 
     public:

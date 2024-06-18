@@ -4,23 +4,26 @@
 
 #include "berry/BernsteinTransform.h"
 
+#include <fstream>
+#include <iomanip>
+
 template <std::size_t DIM>
-BRY::ConstraintMatrices<DIM>::ConstraintMatrices(bry_int_t n_constraints, bry_int_t n_vars, bry_int_t barrier_deg)
+BRY::ConstraintMatrices<DIM>::ConstraintMatrices(bry_int_t n_constraints, bry_int_t n_vars, bry_int_t barrier_deg_)
     : A(n_constraints, n_vars)
     , b(n_constraints)
-    , m_barrier_deg(barrier_deg)
+    , barrier_deg(barrier_deg_)
     , m_diag_deg(false)
 {
-    ASSERT(A.cols() != pow(m_barrier_deg + 1, DIM) + 2, "Number of vars does not match barrier degree + 2");
+    ASSERT(A.cols() == pow(barrier_deg + 1, DIM) + 2, "Number of vars does not match barrier degree + 2");
 }
 
 template <std::size_t DIM>
-BRY::ConstraintMatrices<DIM>::toDiagonalDegree() {
+void BRY::ConstraintMatrices<DIM>::toDiagonalDegree() {
     if (m_diag_deg) {
         WARN("Already in using diagonal degree form");
         return;
     }
-    bry_int_t n_coeffs = pow(m_barrier_deg + 1, DIM);
+    bry_int_t n_coeffs = pow(barrier_deg + 1, DIM);
 
     auto removeCol = [](Eigen::MatrixXd& m, int col) {
         Eigen::MatrixXd new_m(m.rows(), m.cols() - 1);
@@ -30,8 +33,8 @@ BRY::ConstraintMatrices<DIM>::toDiagonalDegree() {
 
     bry_int_t cols_removed = 0;
 
-    for (auto col_midx = mIdxW(DIM, m_barrier_deg + 1); !col_midx.last(); ++col_midx) {
-        if (std::accumulate(col_midx.begin(), col_midx.end(), 0) > m_barrier_deg) {
+    for (auto col_midx = mIdxW(DIM, barrier_deg + 1); !col_midx.last(); ++col_midx) {
+        if (std::accumulate(col_midx.begin(), col_midx.end(), 0) > barrier_deg) {
             removeCol(A, col_midx.inc().wrappedIdx() - cols_removed++);
         }
     }
@@ -65,7 +68,7 @@ void BRY::PolyDynamicsProblem<DIM>::subdivide(uint32_t subdivision) {
 }
 
 template <std::size_t DIM>
-BRY::ConstraintMatrices BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices() const {
+const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices() const {
 
     Matrix Phi_m = BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, degree_increase);
 
@@ -113,8 +116,8 @@ BRY::ConstraintMatrices BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices() c
     // Safe sets
     if (safe_sets.empty())
         WARN("No safe sets were provided");
-    Matrix F_expec_Gamma = m_dynamics->dynamicsPowerMatrix(barrier_deg) * m_noise->additiveNoiseMatrix(barrier_deg);
-    bry_int_t p = m_dynamics->composedDegree(barrier_deg);
+    Matrix F_expec_Gamma = dynamics->dynamicsPowerMatrix(barrier_deg) * noise->additiveNoiseMatrix(barrier_deg);
+    bry_int_t p = dynamics->composedDegree(barrier_deg);
     Matrix Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(p, degree_increase);
     Vector gamma_coeffs = Vector::Ones(Phi_p.cols());
     ASSERT(F_expec_Gamma.rows() == Phi_p.cols(), "Dimension mismatch between F and Phi (p)");
@@ -131,7 +134,7 @@ BRY::ConstraintMatrices BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices() c
         safe_coeffs.block(Phi_p.rows() * i++, 0, Phi_p.rows(), n_cols) = coeffs;
     }
 
-    BRY::ConstraintMatrices constraint_matrices(ws_coeffs.rows() + init_coeffs.rows() + unsafe_coeffs.rows() + safe_coeffs.rows(), n_cols, barrier_deg);
+    BRY::ConstraintMatrices<DIM> constraint_matrices(ws_coeffs.rows() + init_coeffs.rows() + unsafe_coeffs.rows() + safe_coeffs.rows(), n_cols, barrier_deg);
 
     constraint_matrices.A << ws_coeffs, init_coeffs, unsafe_coeffs, safe_coeffs;
     constraint_matrices.b << ws_lower_bound, init_lower_bound, unsafe_lower_bound, safe_lower_bound;
@@ -144,16 +147,16 @@ BRY::ConstraintMatrices BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices() c
 
 
 template <std::size_t DIM>
-void BRY::SynthesisSolution<DIM>::fromDiagonalDegree() {
-    bry_int_t n_coeffs = pow(m_barrier_deg + 1, DIM);
+void BRY::SynthesisResult<DIM>::fromDiagonalDegree() {
+    bry_int_t n_coeffs = pow(barrier_deg + 1, DIM);
     ASSERT(b_values.size() != n_coeffs, "Supplied coefficient vector is already in square-degree form");
     Vector sq_coeffs = Vector::Zero(n_coeffs);
 
     bry_int_t i = 0;
 
-    for (auto col_midx = mIdxW(DIM, m_barrier_deg + 1); !col_midx.last(); ++col_midx) {
-        if (std::accumulate(col_midx.begin(), col_midx.end(), 0) <= m_barrier_deg) {
-            sq_coeffs(col_midx.inc().wrappedIdx()) = certificate_coeffs(i++);
+    for (auto col_midx = mIdxW(DIM, barrier_deg + 1); !col_midx.last(); ++col_midx) {
+        if (std::accumulate(col_midx.begin(), col_midx.end(), 0) <= barrier_deg) {
+            sq_coeffs(col_midx.inc().wrappedIdx()) = b_values(i++);
         }
     }
 
@@ -161,16 +164,50 @@ void BRY::SynthesisSolution<DIM>::fromDiagonalDegree() {
 }
 
 template <std::size_t DIM>
-BRY::SynthesisSolution<DIM> BRY::synthesize<DIM>(const PolyDynamicsProblem<DIM>& problem, const std::string& solver_id) {
+BRY::SynthesisResult<DIM> BRY::synthesize(const PolyDynamicsProblem<DIM>& problem, const std::string& solver_id) {
     LPSolver solver(solver_id);
     
     auto constraints = problem.getConstraintMatrices();
 
     solver.setConstraintMatrices(constraints.A, constraints.b);
 
-    BRY::SynthesisSolution<DIM> result(problem.diag_deg);
+    BRY::SynthesisResult<DIM> result(problem.diag_deg, problem.barrier_deg);
 
     static_cast<LPSolver::Result&>(result) = solver.solve(problem.time_horizon);
 
     return result;
+}
+
+template <std::size_t DIM>
+BRY::SynthesisResult<DIM> BRY::synthesize(const ConstraintMatrices<DIM>& constraints, bry_int_t time_horizon, const std::string& solver_id) {
+    LPSolver solver(solver_id);
+    
+    solver.setConstraintMatrices(constraints.A, constraints.b);
+
+    BRY::SynthesisResult<DIM> result(constraints.diagDeg(), constraints.barrier_deg);
+
+    static_cast<LPSolver::Result&>(result) = solver.solve(time_horizon);
+
+    return result;
+}
+
+void BRY::writeMatrixToFile(const Matrix& matrix, const std::string& filename) {
+    std::ofstream file(filename);
+    if (file.is_open()) {
+        // Write matrix dimensions
+        file << matrix.rows() << " " << matrix.cols() << std::endl;
+
+        // Write matrix data
+        for (int i = 0; i < matrix.rows(); ++i) {
+            for (int j = 0; j < matrix.cols(); ++j) {
+                file << std::fixed << std::setprecision(40) << matrix(i, j);
+                if (j < matrix.cols() - 1) file << " ";
+            }
+            file << std::endl;
+        }
+
+        file.close();
+    } else {
+        std::cerr << "Unable to open file";
+    }
 }
