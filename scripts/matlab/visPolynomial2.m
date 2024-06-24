@@ -6,7 +6,7 @@ function visPolynomial2(coeffs, ws_bounds)
     coeffs = reshape(coeffs, deg, deg);
     
     % Evaluate the 2D polynomial
-    z = polyval2(coeffs, x, y, 5);
+    z = polyval2(coeffs, x, y, 1.2);
     
     % Plot the 2D polynomial
     surf(x, y, z);

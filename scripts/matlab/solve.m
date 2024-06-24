@@ -43,6 +43,7 @@ coeffs = vars(1:end-2);
 eta = vars(end - 1);
 gamma = vars(end);
 fprintf("Eta: %.3f\n", eta)
+fprintf("Gamma: %.3f\n", gamma)
 fprintf("Probability of safety: %.3f\n", 1 - (eta + N * gamma))
 
 if d == 1

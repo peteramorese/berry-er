@@ -5,14 +5,11 @@
 #include "ArgParser.h"
 
 #include <iostream>
-#include <fstream>
-#include <iomanip>
+#include <stdio.h>
 
 #include <Eigen/Dense>
 
 using namespace BRY;
-
-//#define SIMPLE_PROBLEM
 
 int main(int argc, char** argv) {
 
@@ -24,95 +21,78 @@ int main(int argc, char** argv) {
 	auto solver_id = parser.parse<std::string>("s-id", 's', "SCIP", "Solver ID");
 	auto barrier_deg = parser.parse<bry_int_t>("deg", 'd', 4l, "Barrier degree");
 	auto deg_increase = parser.parse<bry_int_t>("deg-inc", 'i', 0l, "Barrier degree increase");
-	auto subd = parser.parse<bry_int_t>("subdiv", 0l, "Set subdivision");
+	auto subd = parser.parse<bry_int_t>("subdiv", "Set subdivision");
 	auto time_steps = parser.parse<uint64_t>("ts", 't', 5, "Number of time steps");
     parser.enableHelp();
 
-#ifdef SIMPLE_PROBLEM
-    constexpr std::size_t DIM = 1;
-    std::shared_ptr<PolynomialDynamics<DIM>> dynamics_ptr = std::make_shared<PolynomialDynamics<1>>(1);    
-    PolynomialDynamics<DIM>& dynamics = *dynamics_ptr;
-    dynamics[0].coeff(0) = 0.0;
-    dynamics[0].coeff(1) = 0.90;
-    //dynamics[0].coeff(2) = 2.2;
-
-    Covariance<DIM> cov;
-    cov(0) = 0.01;
-    std::shared_ptr<Additive2ndMomentNoise<DIM>> noise_ptr = std::make_shared<Additive2ndMomentNoise<DIM>>(cov);
-
-    std::shared_ptr<SynthesisProblem<DIM>> prob(new SynthesisProblem<DIM>());
-
-    // Init set
-    HyperRectangle<DIM> init_set;
-    init_set.lower_bounds(0) = 0.4;
-    init_set.upper_bounds(0) = 0.6;
-    prob->init_sets.push_back(std::move(init_set));
-
-    // Unsafe sets
-    HyperRectangle<DIM> unsafe_set_1;
-    unsafe_set_1.lower_bounds(0) = 0.8;
-    unsafe_set_1.upper_bounds(0) = 1.0;
-    prob->unsafe_sets.push_back(std::move(unsafe_set_1));
-    HyperRectangle<DIM> unsafe_set_2;
-    unsafe_set_2.lower_bounds(0) = 0.0;
-    unsafe_set_2.upper_bounds(0) = 0.2;
-    prob->unsafe_sets.push_back(std::move(unsafe_set_2));
-
-    // Safe set
-    HyperRectangle<DIM> safe_set;
-    safe_set.lower_bounds(0) = 0.2;
-    safe_set.upper_bounds(0) = 0.8;
-    prob->safe_sets.push_back(std::move(safe_set));
-#else
-    constexpr std::size_t DIM = 2;
+    constexpr std::size_t DIM = 3;
 
     std::shared_ptr<PolyDynamicsProblem<DIM>> prob(new PolyDynamicsProblem<DIM>());
 
-    prob->dynamics.reset(new PolynomialDynamics<DIM>(1, 1));
+    prob->dynamics.reset(new PolynomialDynamics<DIM>(1, 1, 1));
     PolynomialDynamics<DIM>& dynamics = *prob->dynamics;
-    dynamics[0].coeff(0, 0) = 0.0;
-    dynamics[0].coeff(1, 0) = 0.5;
-    dynamics[0].coeff(0, 1) = 0.0;
-    dynamics[0].coeff(1, 1) = 0.0;
-    dynamics[1].coeff(0, 0) = 0.0;
-    dynamics[1].coeff(1, 0) = 0.0;
-    dynamics[1].coeff(0, 1) = 0.5;
-    dynamics[1].coeff(1, 1) = 0.0;
+    dynamics[0].coeff(0, 0, 0) = 0.0;
+    dynamics[0].coeff(1, 0, 0) = 0.5;
+    dynamics[0].coeff(0, 1, 0) = 0.5;
+    dynamics[0].coeff(1, 1, 0) = 0.0;
+    dynamics[0].coeff(0, 0, 1) = 0.5;
+    dynamics[0].coeff(1, 0, 1) = 0.0;
+    dynamics[0].coeff(0, 1, 1) = 0.0;
+    dynamics[0].coeff(1, 1, 1) = 0.0;
+    dynamics[1].coeff(0, 0, 0) = 0.0;
+    dynamics[1].coeff(1, 0, 0) = 0.0;
+    dynamics[1].coeff(0, 1, 0) = 0.5;
+    dynamics[1].coeff(1, 1, 0) = 0.0;
+    dynamics[1].coeff(0, 0, 1) = 0.0;
+    dynamics[1].coeff(1, 0, 1) = 0.0;
+    dynamics[1].coeff(0, 1, 1) = 0.5;
+    dynamics[1].coeff(1, 1, 1) = 0.0;
+    dynamics[2].coeff(0, 0, 0) = 0.0;
+    dynamics[2].coeff(1, 0, 0) = 0.0;
+    dynamics[2].coeff(0, 1, 0) = 0.5;
+    dynamics[2].coeff(1, 1, 0) = 0.0;
+    dynamics[2].coeff(0, 0, 1) = 0.5;
+    dynamics[2].coeff(1, 0, 1) = 0.0;
+    dynamics[2].coeff(0, 1, 1) = 0.5;
+    dynamics[2].coeff(1, 1, 1) = 0.0;
 
     Covariance<DIM> cov;
     cov(0, 0) = 0.01;
     cov(1, 0) = 0.00;
+    cov(2, 0) = 0.00;
     cov(0, 1) = 0.00;
     cov(1, 1) = 0.01;
-    prob->noise.reset(new Additive2ndMomentNoise<DIM>(cov));
+    cov(2, 1) = 0.00;
+    cov(0, 2) = 0.00;
+    cov(1, 2) = 0.00;
+    cov(2, 2) = 0.01;
+    prob->noise.reset(new AdditiveGaussianNoise<DIM>(cov));
 
-    Eigen::Vector<bry_float_t, DIM> boundary_width{0.2, 0.2};
+    Eigen::Vector<bry_float_t, DIM> boundary_width{0.2, 0.2, 0.2};
 
-    auto printSetBounds = [](const HyperRectangle<DIM>& set) {
-        DEBUG("Set bounds: [" 
-            << set.lower_bounds(0) << ", " 
-            << set.upper_bounds(0) << ", "
-            << set.lower_bounds(1) << ", " 
-            << set.upper_bounds(1) << "]");
-    };
+    //auto printSetBounds = [](const HyperRectangle<DIM>& set) {
+    //    DEBUG("Set bounds: [" 
+    //        << set.lower_bounds(0) << ", " 
+    //        << set.upper_bounds(0) << ", "
+    //        << set.lower_bounds(1) << ", " 
+    //        << set.upper_bounds(1) << "]");
+    //};
 
 
     HyperRectangle<DIM> workspace;
-    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-1.0, -0.5) - boundary_width;
-    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.5, 0.5) + boundary_width;
+    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(0.0, 0.0, 0.0) - boundary_width;
+    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(1.0, 1.0, 1.0) + boundary_width;
     prob->setWorkspace(workspace);
-    DEBUG("Workspace set:");
-    printSetBounds(workspace);
 
     // Init set
     HyperRectangle<DIM> init_set;
-    init_set.lower_bounds(0) = -0.8;
-    init_set.upper_bounds(0) = -0.6;
-    init_set.lower_bounds(1) = 0.0;
-    init_set.upper_bounds(1) = 0.2;
+    init_set.lower_bounds(0) = 0.6;
+    init_set.upper_bounds(0) = 0.6;
+    init_set.upper_bounds(0) = 0.6;
+    init_set.lower_bounds(1) = 0.7;
+    init_set.upper_bounds(1) = 0.7;
+    init_set.upper_bounds(1) = 0.7;
     prob->init_sets.push_back(init_set);
-    DEBUG("Init set:");
-    printSetBounds(init_set);
     
     NEW_LINE;
 
@@ -125,7 +105,6 @@ int main(int argc, char** argv) {
     boundary_left.lower_bounds(1) = -0.5 - boundary_width(1);
     boundary_left.upper_bounds(1) = 0.5 + boundary_width(1);
     prob->unsafe_sets.push_back(boundary_left);
-    printSetBounds(boundary_left);
     // Boundary right
     HyperRectangle<DIM> boundary_right;
     boundary_right.lower_bounds(0) = 0.5;
@@ -133,7 +112,6 @@ int main(int argc, char** argv) {
     boundary_right.lower_bounds(1) = -0.5 - boundary_width(1);
     boundary_right.upper_bounds(1) = 0.5 + boundary_width(1);
     prob->unsafe_sets.push_back(boundary_right);
-    printSetBounds(boundary_right);
     // Boundary top
     HyperRectangle<DIM> boundary_top;
     boundary_top.lower_bounds(0) = -1.0;
@@ -141,7 +119,6 @@ int main(int argc, char** argv) {
     boundary_top.lower_bounds(1) = 0.5;
     boundary_top.upper_bounds(1) = 0.5 + boundary_width(1);
     prob->unsafe_sets.push_back(boundary_top);
-    printSetBounds(boundary_top);
     // Boundary bottom
     HyperRectangle<DIM> boundary_bottom;
     boundary_bottom.lower_bounds(0) = -1.0;
@@ -149,7 +126,6 @@ int main(int argc, char** argv) {
     boundary_bottom.lower_bounds(1) = -0.5 - boundary_width(1);
     boundary_bottom.upper_bounds(1) = -0.5;
     prob->unsafe_sets.push_back(boundary_bottom);
-    printSetBounds(boundary_bottom);
     if (non_convex) {
         // Non convex unsafe regions
         HyperRectangle<DIM> upper_region;
@@ -158,14 +134,12 @@ int main(int argc, char** argv) {
         upper_region.lower_bounds(1) = -0.17;
         upper_region.upper_bounds(1) = -0.13;
         prob->unsafe_sets.push_back(upper_region);
-        printSetBounds(upper_region);
         HyperRectangle<DIM> lower_region;
         lower_region.lower_bounds(0) = -0.57;
         lower_region.upper_bounds(0) = -0.53;
         lower_region.lower_bounds(1) = 0.28;
         lower_region.upper_bounds(1) = 0.32;
         prob->unsafe_sets.push_back(lower_region);
-        printSetBounds(lower_region);
     }
 
     // Safe set
@@ -205,7 +179,6 @@ int main(int argc, char** argv) {
         safe_sets[4].lower_bounds(1) = -0.5;
         safe_sets[4].upper_bounds(1) = 0.5;
     }
-#endif
 
     prob->time_horizon = time_steps.get();
     prob->barrier_deg = barrier_deg.get();
@@ -231,7 +204,10 @@ int main(int argc, char** argv) {
         INFO("Done!");
         NEW_LINE;
         INFO("Probability of safety: " << result.p_safe);
-        INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
+
+        printf("Eta = %.32f\n", result.eta);
+        printf("Gamma = %.32f\n", result.gamma);
+        //INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
         INFO("Computation time: " << result.comp_time << "s");
 
         if (result.diagDeg())

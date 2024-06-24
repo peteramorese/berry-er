@@ -39,7 +39,7 @@ struct PolyDynamicsProblem {
     std::shared_ptr<PolynomialDynamics<DIM>> dynamics;
 
     /// @brief Noise
-    std::shared_ptr<Additive2ndMomentNoise<DIM>> noise;
+    std::shared_ptr<AdditiveGaussianNoise<DIM>> noise;
 
     /* Set definitions */
     std::vector<HyperRectangle<DIM>> workspace_sets = {HyperRectangle<DIM>()};

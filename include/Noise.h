@@ -10,14 +10,18 @@ template <std::size_t DIM>
 using Covariance = Eigen::Matrix<bry_float_t, DIM, DIM>;
 
 template <std::size_t DIM>
-class Additive2ndMomentNoise {
+class AdditiveGaussianNoise {
     public:
-        Additive2ndMomentNoise() = delete;
-        Additive2ndMomentNoise(const Covariance<DIM>& covariance);
+        AdditiveGaussianNoise() = delete;
+        AdditiveGaussianNoise(const Covariance<DIM>& covariance);
+        AdditiveGaussianNoise(const Eigen::Vector<bry_float_t, DIM>& mean, const Covariance<DIM>& covariance);
 
         Matrix additiveNoiseMatrix(bry_int_t m) const;
+
+        Matrix momentMatrix(bry_int_t m) const;
         
     private:
+        Eigen::Vector<bry_float_t, DIM> m_mean;
         Covariance<DIM> m_cov;
 
 };
