@@ -19,6 +19,22 @@ class AdditiveGaussianNoise {
         Matrix additiveNoiseMatrix(bry_int_t m) const;
 
         Matrix momentMatrix(bry_int_t m) const;
+
+    private:
+        class MomentGenerator {
+            public:
+                MomentGenerator(const AdditiveGaussianNoise* enclosing, bry_int_t m);
+
+                template <std::size_t SUB_DIM>
+                void computeMoments(const Polynomial<DIM>& corner_coeff_polynomial, std::array<bry_int_t, DIM> curr_idx, const std::array<bry_int_t, SUB_DIM>& span_dims);
+
+                Matrix extractMatrix() const;
+            private:
+                const AdditiveGaussianNoise* m_enclosing;
+                bry_int_t m_m;
+                Eigen::Tensor<bry_float_t, DIM> m_tensor;
+                bry_int_t m_counter = 0;
+        };
         
     private:
         Eigen::Vector<bry_float_t, DIM> m_mean;
