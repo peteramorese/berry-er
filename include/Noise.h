@@ -25,12 +25,14 @@ class AdditiveGaussianNoise {
             public:
                 MomentGenerator(const AdditiveGaussianNoise* enclosing, bry_int_t m);
 
-                template <typename INCR_OBJECT, std::size_t SUB_DIM>
-                void computeMoments(INCR_OBJECT* corner_incr_obj, std::array<bry_int_t, DIM> curr_idx, const std::array<bry_int_t, SUB_DIM>& span_dims);
-
                 Matrix extractMatrix() const;
+
             private:
+                template <typename INCR_OBJECT, std::size_t SUB_DIM>
+                void minPathIncr(INCR_OBJECT* corner_incr_obj, std::array<bry_int_t, DIM> curr_idx, const std::array<bry_int_t, SUB_DIM>& span_dims);
+
                 bool hasNotBeenSeen(const std::array<bry_int_t, DIM>& idx);
+
             private:
                 const AdditiveGaussianNoise* m_enclosing;
                 bry_int_t m_m;

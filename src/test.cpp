@@ -47,16 +47,16 @@ int main(int argc, char** argv) {
     noise.momentMatrix(3);
     }
 
-    //{
-    //Eigen::Vector<bry_float_t, 5> mean;
-    //mean(0) = 10;
-    //mean(1) = 100;
-    //mean(2) = 300;
-    //mean(3) = 300;
-    //mean(4) = 500;
-    //AdditiveGaussianNoise<5> noise(mean, Covariance<5>::Zero());
-    //noise.momentMatrix(3);
-    //}
+    {
+    Eigen::Vector<bry_float_t, 5> mean;
+    mean(0) = 10;
+    mean(1) = 100;
+    mean(2) = 300;
+    mean(3) = 300;
+    mean(4) = 500;
+    AdditiveGaussianNoise<5> noise(mean, Covariance<5>::Zero());
+    noise.momentMatrix(3);
+    }
 
     //{
     //Eigen::Vector<bry_float_t, 2> mean;
