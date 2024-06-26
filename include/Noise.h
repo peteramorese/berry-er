@@ -30,10 +30,13 @@ class AdditiveGaussianNoise {
 
                 Matrix extractMatrix() const;
             private:
+                bool hasNotBeenSeen(const std::array<bry_int_t, DIM>& idx);
+            private:
                 const AdditiveGaussianNoise* m_enclosing;
                 bry_int_t m_m;
                 Eigen::Tensor<bry_float_t, DIM> m_tensor;
                 bry_int_t m_counter = 0;
+                std::vector<bool> m_duplicate;
         };
         
     private:

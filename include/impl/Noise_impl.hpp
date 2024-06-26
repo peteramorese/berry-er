@@ -5,6 +5,8 @@
 #include "berry/MultiIndex.h"
 #include "berry/Operations.h"
 
+#include <algorithm>
+
 template <std::size_t DIM>
 BRY::AdditiveGaussianNoise<DIM>::AdditiveGaussianNoise(const Covariance<DIM>& covariance) 
     : m_mean(Eigen::Vector<bry_float_t, DIM>::Zero())
@@ -79,6 +81,7 @@ BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::MomentGenerator(const Additive
     : m_enclosing(enclosing)
     , m_m(m)
     , m_tensor(makeUniformArray<bry_int_t, DIM>(m + 1))
+    , m_duplicate(m_tensor.size(), false)
 {
     Polynomial<DIM> p_exp(2);
 
@@ -119,35 +122,39 @@ template <std::size_t DIM>
 template <std::size_t SUB_DIM>
 void BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::computeMoments(const Polynomial<DIM>& corner_coeff_polynomial, std::array<bry_int_t, DIM> corner_idx, const std::array<bry_int_t, SUB_DIM>& span_dims) { 
     std::string space(2*(DIM - SUB_DIM), ' ');
-    //std::string space(1, ' ');
-    std::cout << space << "SUBDIM: " << SUB_DIM << std::endl;
-    std::cout << space << "span dims: [";
-    for (std::size_t i = 0; i < SUB_DIM; ++i) {
-        std::cout << span_dims[i] << ", ";
-    }
-    std::cout << "]" << std::endl;
-    std::cout << space << "corner idx: ";
-    for (std::size_t i = 0; i < DIM; ++i) {
-        std::cout << corner_idx[i] << ", ";
-    }
-    std::cout << std::endl;
+    //PAUSE;
+    //std::cout << space << "SUBDIM: " << SUB_DIM << std::endl;
+    //std::cout << space << "span dims: [";
+    //for (std::size_t i = 0; i < SUB_DIM; ++i) {
+    //    std::cout << span_dims[i] << ", ";
+    //}
+    //std::cout << "]" << std::endl;
+    //std::cout << space << "corner idx: ";
+    //for (std::size_t i = 0; i < DIM; ++i) {
+    //    std::cout << corner_idx[i] << ", ";
+    //}
+    //std::cout << std::endl;
 
     if constexpr (SUB_DIM == 1) {
         ++corner_idx[span_dims[0]];
         for (; corner_idx[span_dims[0]] < m_m + 1; ++corner_idx[span_dims[0]]) {
-            std::cout << "n ";
-            for (std::size_t i = 0; i < DIM; ++i) {
-                std::cout << corner_idx[i] << ", ";
+            if (hasNotBeenSeen(corner_idx)) {
+                std::cout << "n ";
+                for (std::size_t i = 0; i < DIM; ++i) {
+                    std::cout << corner_idx[i] << ", ";
+                }
+                std::cout << std::endl;
+                ++m_counter;
             }
-            std::cout << std::endl;
-            ++m_counter;
         }
     } else {
             //DEBUG("NEW Span dims ");
             //for (auto e : new_span_dims)
             //    DEBUG(e);
 
-        for (std::size_t corner_i = corner_idx[span_dims[0]]; corner_i < m_m + 1; ++corner_i) {
+        bry_int_t max_starting_idx = *std::max_element(corner_idx.begin(), corner_idx.end());
+        for (std::size_t corner_i = 0; corner_i < m_m + 1 - max_starting_idx; ++corner_i) {
+            //std::cout << space << "corner " << corner_i << "/" << m_m - corner_idx[span_dims[0]] << std::endl;
             
             // Copy the corner polynomial in to a cache polynomial for each subdim
             std::vector<Polynomial<DIM>> cache_polynomials;
@@ -159,11 +166,13 @@ void BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::computeMoments(const Poly
             // Increment the corner indices along the span dimensions
             std::array<bry_int_t, DIM> new_corner_idx = corner_idx;
             for (bry_int_t span_idx : span_dims) {
-                new_corner_idx[span_idx] = corner_i;
+                new_corner_idx[span_idx] += corner_i;
             }
+            //std::cout << "FIRST new corner idx 0: " << new_corner_idx[0] << ", 1: "<< new_corner_idx[1] << ", 2: "<< new_corner_idx[2] << std::endl;
 
             // If not the first corner after a split, then compute the coefficient
-            if (corner_i > corner_idx[span_dims[0]]) {
+            //if (corner_i > 0) {
+            if (hasNotBeenSeen(new_corner_idx)) {
                 std::cout << "c ";
                 for (std::size_t d = 0; d < DIM; ++d) {
                     std::cout << new_corner_idx[d] << ", ";
@@ -171,23 +180,50 @@ void BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::computeMoments(const Poly
                 std::cout << std::endl;
                 ++m_counter;
             }
+            //}
 
-            // When it makes it to the last index, don't bother making any recursive calls
-            if (corner_i == m_m)
-                continue;
+            //// When it makes it to the last index, don't bother making any recursive calls
+            //if (corner_i == m_m - corner_idx[span_dims[0]])
+            //    continue;
 
             // For each remaining dimension, compute the moments for the perpendicular subspace
-            for (std::size_t perp_dim_i = 0; perp_dim_i < SUB_DIM; ++perp_dim_i) {
+            for (bry_int_t subspace_dim_i = 0; subspace_dim_i < SUB_DIM; ++subspace_dim_i) {
+
+                // Offset the corner to prevent duplicates
+                //bry_int_t inc_idx;
+                //if constexpr (SUB_DIM > 2) {
+                //    inc_idx = (subspace_dim_i) % SUB_DIM;
+                //    //std::cout << space << "incrementing corner along idx " << inc_idx << std::endl;
+                //    //PRINT_VEC3("new corner before inc ", new_corner_idx);
+                //    ++new_corner_idx[inc_idx];
+                //}
+
+                //std::cout << "B4 SECOND new corner idx 0: " << new_corner_idx[0] << ", 1: "<< new_corner_idx[1] << ", 2: "<< new_corner_idx[2] << std::endl;
                 std::array<bry_int_t, SUB_DIM - 1> new_span_dims;
                 auto it = new_span_dims.begin();
-                for (std::size_t sub_dim_i = 0; sub_dim_i < SUB_DIM; ++sub_dim_i) {
-                    if (sub_dim_i != perp_dim_i)
-                        *(it++) = span_dims[sub_dim_i];
+                for (bry_int_t sub_dim_i = 0; sub_dim_i < SUB_DIM - 1; ++sub_dim_i) {
+                    new_span_dims[sub_dim_i] = span_dims[(subspace_dim_i + sub_dim_i) % SUB_DIM];
                 }
 
-                computeMoments<SUB_DIM - 1>(cache_polynomials[perp_dim_i], new_corner_idx, new_span_dims);
+                //PRINT_VEC3("new corner before rec call ", new_corner_idx);
+                computeMoments<SUB_DIM - 1>(cache_polynomials[subspace_dim_i], new_corner_idx, new_span_dims);
 
+                // Remove the offset to make the index return to normal
+                //if constexpr (SUB_DIM > 2) {
+                //    --new_corner_idx[inc_idx];
+                //}
             }
         }
     }
-};
+}
+
+template <std::size_t DIM>
+bool BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::hasNotBeenSeen(const std::array<bry_int_t, DIM>& idx) {
+    bry_int_t flat_idx = &m_tensor(idx) - m_tensor.data();
+    if (m_duplicate[flat_idx]) {
+        return false;
+    } else {
+        m_duplicate[flat_idx] = true;
+        return true;
+    }
+}

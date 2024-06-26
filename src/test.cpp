@@ -38,12 +38,32 @@ int main(int argc, char** argv) {
     cov(1, 2) = 4.00;
     cov(2, 2) = 4.00;
 
-    Eigen::Vector<bry_float_t, 3> mean;
+    //{
+    //Eigen::Vector<bry_float_t, 3> mean;
+    //mean(0) = 10;
+    //mean(1) = 100;
+    //mean(2) = 300;
+    //AdditiveGaussianNoise<3> noise(mean, cov);
+    //noise.momentMatrix(3);
+    //}
+
+    {
+    Eigen::Vector<bry_float_t, 4> mean;
     mean(0) = 10;
     mean(1) = 100;
     mean(2) = 300;
-    AdditiveGaussianNoise<3> noise(mean, cov);
-    noise.momentMatrix(2);
+    mean(3) = 300;
+    AdditiveGaussianNoise<4> noise(mean, Covariance<4>::Zero());
+    noise.momentMatrix(3);
+    }
+
+    //{
+    //Eigen::Vector<bry_float_t, 2> mean;
+    //mean(0) = 10;
+    //mean(1) = 100;
+    //AdditiveGaussianNoise<2> noise(mean, Covariance<2>::Zero());
+    //noise.momentMatrix(2);
+    //}
     return 0;
 }
  
