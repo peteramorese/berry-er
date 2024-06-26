@@ -106,10 +106,24 @@ BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::MomentGenerator(const Additive
     for (std::size_t i = 0; i < DIM; ++i)
         span_dims[i] = i;
 
-    DEBUG("ORIG Span dims ");
-    for (auto e : span_dims)
-        DEBUG(e);
-    computeMoments<DIM>(p_exp, makeUniformArray<bry_int_t, DIM>(0), span_dims);
+    struct ParDerivIncr {
+        ParDerivIncr(const std::array<bry_int_t, DIM>& init_arr) : arr(init_arr) {}
+        ParDerivIncr(const ParDerivIncr&) = default;
+        void increment(bry_int_t incr_idx) {
+            ++arr[incr_idx];
+        }
+        void compute(const std::array<bry_int_t, DIM>& idx) {
+            std::cout << ">>";
+            for (std::size_t i = 0; i < DIM; ++i) {
+                std::cout << arr[i] << ", ";
+            }
+            std::cout << "\n";
+        }
+        std::array<bry_int_t, DIM> arr;
+    };
+    ParDerivIncr init_incr_obj(makeUniformArray<bry_int_t, DIM>(0));
+
+    computeMoments<ParDerivIncr, DIM>(&init_incr_obj, makeUniformArray<bry_int_t, DIM>(0), span_dims);
     
     bry_int_t tru_count = 0;
     for (auto midx = mIdx(DIM, m+1); !midx.last(); ++midx)
@@ -119,8 +133,8 @@ BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::MomentGenerator(const Additive
 }
 
 template <std::size_t DIM>
-template <std::size_t SUB_DIM>
-void BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::computeMoments(const Polynomial<DIM>& corner_coeff_polynomial, std::array<bry_int_t, DIM> corner_idx, const std::array<bry_int_t, SUB_DIM>& span_dims) { 
+template <typename INCR_OBJECT, std::size_t SUB_DIM>
+void BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::computeMoments(INCR_OBJECT* corner_incr_obj, std::array<bry_int_t, DIM> corner_idx, const std::array<bry_int_t, SUB_DIM>& span_dims) { 
     std::string space(2*(DIM - SUB_DIM), ' ');
     //PAUSE;
     //std::cout << space << "SUBDIM: " << SUB_DIM << std::endl;
@@ -144,30 +158,31 @@ void BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::computeMoments(const Poly
                     std::cout << corner_idx[i] << ", ";
                 }
                 std::cout << std::endl;
+                corner_incr_obj->increment(span_dims[0]);
+                corner_incr_obj->compute(corner_idx);
                 ++m_counter;
             }
         }
     } else {
-            //DEBUG("NEW Span dims ");
-            //for (auto e : new_span_dims)
-            //    DEBUG(e);
-
         bry_int_t max_starting_idx = *std::max_element(corner_idx.begin(), corner_idx.end());
         for (std::size_t corner_i = 0; corner_i < m_m + 1 - max_starting_idx; ++corner_i) {
             //std::cout << space << "corner " << corner_i << "/" << m_m - corner_idx[span_dims[0]] << std::endl;
             
-            // Copy the corner polynomial in to a cache polynomial for each subdim
-            std::vector<Polynomial<DIM>> cache_polynomials;
-            cache_polynomials.reserve(SUB_DIM);
-            for (std::size_t i = 0; i < SUB_DIM; ++i) {
-                cache_polynomials.emplace_back(corner_coeff_polynomial);
-            }
-
             // Increment the corner indices along the span dimensions
             std::array<bry_int_t, DIM> new_corner_idx = corner_idx;
             for (bry_int_t span_idx : span_dims) {
                 new_corner_idx[span_idx] += corner_i;
+                if (corner_i)
+                    corner_incr_obj->increment(span_idx);
             }
+
+            // Copy the incr object into new caches
+            std::vector<INCR_OBJECT> cache_incr_objs;
+            cache_incr_objs.reserve(SUB_DIM);
+            for (std::size_t i = 0; i < SUB_DIM; ++i) {
+                cache_incr_objs.emplace_back(*corner_incr_obj);
+            }
+
             //std::cout << "FIRST new corner idx 0: " << new_corner_idx[0] << ", 1: "<< new_corner_idx[1] << ", 2: "<< new_corner_idx[2] << std::endl;
 
             // If not the first corner after a split, then compute the coefficient
@@ -178,13 +193,15 @@ void BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::computeMoments(const Poly
                     std::cout << new_corner_idx[d] << ", ";
                 }
                 std::cout << std::endl;
+
+                corner_incr_obj->compute(new_corner_idx);
                 ++m_counter;
             }
             //}
 
             //// When it makes it to the last index, don't bother making any recursive calls
-            //if (corner_i == m_m - corner_idx[span_dims[0]])
-            //    continue;
+            if (corner_i == m_m - max_starting_idx)
+                continue;
 
             // For each remaining dimension, compute the moments for the perpendicular subspace
             for (bry_int_t subspace_dim_i = 0; subspace_dim_i < SUB_DIM; ++subspace_dim_i) {
@@ -206,7 +223,7 @@ void BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::computeMoments(const Poly
                 }
 
                 //PRINT_VEC3("new corner before rec call ", new_corner_idx);
-                computeMoments<SUB_DIM - 1>(cache_polynomials[subspace_dim_i], new_corner_idx, new_span_dims);
+                computeMoments<INCR_OBJECT, SUB_DIM - 1>(&cache_incr_objs[subspace_dim_i], new_corner_idx, new_span_dims);
 
                 // Remove the offset to make the index return to normal
                 //if constexpr (SUB_DIM > 2) {

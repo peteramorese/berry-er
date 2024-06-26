@@ -25,8 +25,8 @@ class AdditiveGaussianNoise {
             public:
                 MomentGenerator(const AdditiveGaussianNoise* enclosing, bry_int_t m);
 
-                template <std::size_t SUB_DIM>
-                void computeMoments(const Polynomial<DIM>& corner_coeff_polynomial, std::array<bry_int_t, DIM> curr_idx, const std::array<bry_int_t, SUB_DIM>& span_dims);
+                template <typename INCR_OBJECT, std::size_t SUB_DIM>
+                void computeMoments(INCR_OBJECT* corner_incr_obj, std::array<bry_int_t, DIM> curr_idx, const std::array<bry_int_t, SUB_DIM>& span_dims);
 
                 Matrix extractMatrix() const;
             private:
