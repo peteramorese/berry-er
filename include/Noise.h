@@ -18,14 +18,14 @@ class AdditiveGaussianNoise {
 
         Matrix additiveNoiseMatrix(bry_int_t m) const;
 
-        Matrix momentMatrix(bry_int_t m) const;
+        Eigen::Tensor<bry_float_t, DIM> momentTensor(bry_int_t m) const;
 
     private:
         class MomentGenerator {
             public:
                 MomentGenerator(const AdditiveGaussianNoise* enclosing, bry_int_t m);
 
-                Matrix extractMatrix() const;
+                const Eigen::Tensor<bry_float_t, DIM>& getTensor() const;
 
             private:
                 template <typename INCR_OBJECT, std::size_t SUB_DIM>

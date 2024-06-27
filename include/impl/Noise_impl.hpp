@@ -26,6 +26,8 @@ BRY::Matrix BRY::AdditiveGaussianNoise<DIM>::additiveNoiseMatrix(bry_int_t m) co
     Matrix Gamma(m_monoms, m_monoms);
     Gamma.setZero();
 
+    Eigen::Tensor<bry_float_t, DIM> moment_tensor = momentTensor(m);
+
     for (auto col_midx = mIdxW(DIM, m + 1); !col_midx.last(); ++col_midx) {
 
         std::vector<bry_int_t> index_bounds(col_midx.size());
@@ -39,6 +41,7 @@ BRY::Matrix BRY::AdditiveGaussianNoise<DIM>::additiveNoiseMatrix(bry_int_t m) co
             bool zero = false;
             bry_int_t moment = 0;
             int64_t first_cov_idx = -1;
+            /* TODO fix this */
             for (std::size_t j = 0; j < DIM; ++j) {
                 bry_int_t exp = col_midx[j] - row_midx[j];
                 if (moment + exp > 2) {
@@ -69,11 +72,9 @@ BRY::Matrix BRY::AdditiveGaussianNoise<DIM>::additiveNoiseMatrix(bry_int_t m) co
 }
 
 template <std::size_t DIM>
-BRY::Matrix BRY::AdditiveGaussianNoise<DIM>::momentMatrix(bry_int_t m) const {
-
+Eigen::Tensor<BRY::bry_float_t, DIM> BRY::AdditiveGaussianNoise<DIM>::momentTensor(bry_int_t m) const {
     MomentGenerator gen(this, m);
-
-    return Matrix(2,2);
+    return gen.getTensor();
 }
 
 template <std::size_t DIM>
@@ -99,44 +100,68 @@ BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::MomentGenerator(const Additive
             p_exp.coeff(sigma_inds) += 0.5 * m_enclosing->m_cov(i, j);
         }
     }
-    //Matrix(2,2)
-    Eigen::Tensor<bry_float_t, DIM> moments(makeUniformArray<bry_int_t, DIM>(m + 1));
+    //DEBUG("p_exp: " << p_exp);
 
     std::array<bry_int_t, DIM> span_dims;
     for (std::size_t i = 0; i < DIM; ++i)
         span_dims[i] = i;
 
+    // Compute the first derivatives once and store them to save time
+    std::vector<Polynomial<DIM>> exp_polynomial_first_derivatives;
+    exp_polynomial_first_derivatives.reserve(DIM);
+    for (bry_int_t d = 0; d < DIM; ++d) {
+        exp_polynomial_first_derivatives.emplace_back(p_exp.derivative(d));
+        //DEBUG("   p_exp deriv wrt x" << d << ": " << exp_polynomial_first_derivatives.back());
+    }
+
     // Define the object to increment
     struct ParDerivIncr {
-        ParDerivIncr(Eigen::Tensor<bry_float_t, DIM>* tensor_ptr_, const Polynomial<DIM>* exp_polynomial_, const Polynomial<DIM>& init_polynomial) 
+        ParDerivIncr(Eigen::Tensor<bry_float_t, DIM>* tensor_ptr_, 
+                    const Polynomial<DIM>* exp_polynomial_, 
+                    const std::vector<Polynomial<DIM>>* exp_polynomial_derivatives_, 
+                    const Polynomial<DIM>& init_polynomial) 
             : tensor_ptr(tensor_ptr_) 
             , exp_polynomial(exp_polynomial_)
+            , exp_polynomial_derivatives(exp_polynomial_derivatives_)
             , polynomial(init_polynomial)
             {}
         ParDerivIncr(const ParDerivIncr&) = default;
 
         void increment(bry_int_t incr_idx) {
             // Take the partial derivative of the MGF wrt the incr idx
-            polynomial = polynomial.derivative(incr_idx) + polynomial * exp_polynomial->derivative(incr_idx);
+
+            //DEBUG("curr poly: " << polynomial << " deg: " << polynomial.degree());
+            //DEBUG("curr poly derivative: " << polynomial.derivative(incr_idx));
+            //DEBUG("exp poly derivative:  " << (*exp_polynomial_derivatives)[incr_idx] << " deg: " << (*exp_polynomial_derivatives)[incr_idx].degree());
+            //DEBUG("prod:  " << polynomial * (*exp_polynomial_derivatives)[incr_idx]);
+            polynomial = polynomial.derivative(incr_idx) + polynomial * (*exp_polynomial_derivatives)[incr_idx];
         }
 
         void compute(const std::array<bry_int_t, DIM>& idx) {
-            m_tensor(idx) = (*polynomial.tensor().data()) * std::exp(*exp_polynomial.tensor().data());
+            (*tensor_ptr)(idx) = (*polynomial.tensor().data());
         }
 
         Eigen::Tensor<bry_float_t, DIM>* tensor_ptr;
         const Polynomial<DIM>* exp_polynomial;
+        const std::vector<Polynomial<DIM>>* exp_polynomial_derivatives;
         Polynomial<DIM> polynomial;
     };
-    ParDerivIncr init_incr_obj(makeUniformArray<bry_int_t, DIM>(0));
 
+    // Make the initial object
+    Polynomial<DIM> init_polynomial(0);
+    init_polynomial.coeff(makeUniformArray<bry_int_t, DIM>(0)) = 1.0;
+    //DEBUG("Init polynomial: " << init_polynomial);
+    ParDerivIncr init_incr_obj(&m_tensor, &p_exp, &exp_polynomial_first_derivatives, init_polynomial);
+
+    INFO("Calculating moment matrix...");
     minPathIncr<ParDerivIncr, DIM>(&init_incr_obj, makeUniformArray<bry_int_t, DIM>(0), span_dims);
-    
-    bry_int_t tru_count = 0;
-    for (auto midx = mIdx(DIM, m+1); !midx.last(); ++midx)
-        ++tru_count;
-    INFO("Count: " << m_counter << ", true count: " << tru_count);
+    NEW_LINE;
+    INFO("Done!");
+}
 
+template <std::size_t DIM>
+const Eigen::Tensor<BRY::bry_float_t, DIM>& BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::getTensor() const {
+    return m_tensor;
 }
 
 template <std::size_t DIM>
@@ -167,7 +192,6 @@ void BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::minPathIncr(INCR_OBJECT* 
                 //std::cout << std::endl;
                 corner_incr_obj->increment(span_dims[0]);
                 corner_incr_obj->compute(corner_idx);
-                ++m_counter;
             }
         }
     } else {
@@ -202,7 +226,6 @@ void BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::minPathIncr(INCR_OBJECT* 
                 //std::cout << std::endl;
 
                 corner_incr_obj->compute(new_corner_idx);
-                ++m_counter;
             }
             //}
 
@@ -247,6 +270,8 @@ bool BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::hasNotBeenSeen(const std:
     if (m_duplicate[flat_idx]) {
         return false;
     } else {
+        ++m_counter;
+        INFO_SMLN(" " << m_counter << " / " << m_tensor.size());
         m_duplicate[flat_idx] = true;
         return true;
     }
