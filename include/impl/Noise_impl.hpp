@@ -38,37 +38,23 @@ BRY::Matrix BRY::AdditiveGaussianNoise<DIM>::additiveNoiseMatrix(bry_int_t m) co
 
             bry_float_t element = 1.0;
 
-            bool zero = false;
-            bry_int_t moment = 0;
-            int64_t first_cov_idx = -1;
-            /* TODO fix this */
-            for (std::size_t j = 0; j < DIM; ++j) {
-                bry_int_t exp = col_midx[j] - row_midx[j];
-                if (moment + exp > 2) {
-                    zero = true;
-                    break;
-                } else if (exp == 2) {
-                    element *= m_cov(j, j);
-                    moment = 2;
-                } else if (exp == 1) {
-                    if (first_cov_idx == -1) {
-                        first_cov_idx = j;
-                        moment = 1;
-                    } else {
-                        element *= m_cov(first_cov_idx, j);
-                        moment = 2;
-                    }
-                }
+            std::array<bry_int_t, DIM> moment_idx;
+            bry_int_t moment_exp_sum = 0;
+            for (bry_int_t j = 0; j < DIM; ++j) {
+                moment_idx[j] = col_midx[j] - row_midx[j];
+                moment_exp_sum += moment_idx[j];
                 element *= binom(col_midx[j], row_midx[j]);
             }
 
-            if (!(zero || moment == 1)) {
+            // Force remove odd-power moments for better numerical accuracy
+            if (moment_exp_sum % 2 == 0) {
+                element *= moment_tensor(moment_idx);
                 Gamma(row_midx.inc().wrappedIdx(), col_midx.inc().wrappedIdx()) = element;
             }
         }
     }
     
-    return Gamma;
+    return Gamma.transpose();
 }
 
 template <std::size_t DIM>
