@@ -116,6 +116,8 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     // Safe sets
     if (safe_sets.empty())
         WARN("No safe sets were provided");
+    //DEBUG("Dynamics power matrix: \n" << dynamics->dynamicsPowerMatrix(barrier_deg));
+    //DEBUG("Noise matrix: \n" << noise->additiveNoiseMatrix(barrier_deg));
     Matrix F_expec_Gamma = dynamics->dynamicsPowerMatrix(barrier_deg) * noise->additiveNoiseMatrix(barrier_deg);
     bry_int_t p = dynamics->composedDegree(barrier_deg);
     Matrix Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(p, degree_increase);
@@ -125,9 +127,13 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     Matrix safe_coeffs(safe_sets.size() * Phi_p.rows(), n_cols);
     Vector safe_lower_bound = Vector::Zero(safe_coeffs.rows());
     i = 0;
+
+    Matrix deg_lift_tf = makeDegreeChangeTransform<DIM>(barrier_deg, p);
+
     for (const HyperRectangle<DIM>& set : safe_sets) {
+        //DEBUG("Set transformation:\n" << set.transformationMatrix(p));
         Matrix beta_coeffs = 
-            -Phi_p * set.transformationMatrix(p) * (F_expec_Gamma - Matrix::Identity(F_expec_Gamma.rows(), F_expec_Gamma.cols()));
+            -Phi_p * set.transformationMatrix(p) * (F_expec_Gamma - deg_lift_tf);
         
         Matrix coeffs(beta_coeffs.rows(), n_cols);
         coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Ones(beta_coeffs.rows());

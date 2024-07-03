@@ -27,6 +27,7 @@ BRY::Matrix BRY::AdditiveGaussianNoise<DIM>::additiveNoiseMatrix(bry_int_t m) co
     Gamma.setZero();
 
     Eigen::Tensor<bry_float_t, DIM> moment_tensor = momentTensor(m);
+    //DEBUG("MOMENT TENSOR: \n" << moment_tensor);
 
     for (auto col_midx = mIdxW(DIM, m + 1); !col_midx.last(); ++col_midx) {
 
@@ -53,8 +54,9 @@ BRY::Matrix BRY::AdditiveGaussianNoise<DIM>::additiveNoiseMatrix(bry_int_t m) co
             }
         }
     }
+    //DEBUG("Gamma: \n" << Gamma.transpose());
     
-    return Gamma.transpose();
+    return Gamma;
 }
 
 template <std::size_t DIM>
@@ -136,7 +138,7 @@ BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::MomentGenerator(const Additive
     // Make the initial object
     Polynomial<DIM> init_polynomial(0);
     init_polynomial.coeff(makeUniformArray<bry_int_t, DIM>(0)) = 1.0;
-    //DEBUG("Init polynomial: " << init_polynomial);
+    *m_tensor.data() = 1.0;
     ParDerivIncr init_incr_obj(&m_tensor, &p_exp, &exp_polynomial_first_derivatives, init_polynomial);
 
     INFO("Calculating moment matrix...");

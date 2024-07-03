@@ -177,6 +177,10 @@ int main(int argc, char** argv) {
         prob->subdivide(subd.get());
     }
 
+    //Matrix F_expec_Gamma = prob->dynamics->dynamicsPowerMatrix(prob->barrier_deg) * prob->noise->additiveNoiseMatrix(prob->barrier_deg);
+    //DEBUG("F expec[Gamma] =  \n" << F_expec_Gamma);
+    //writeMatrixToFile(F_expec_Gamma, "F_expec_Gamma.txt");
+
     ConstraintMatrices<DIM> constraints = prob->getConstraintMatrices();
 
     INFO("Exporting constraint matrices...");
