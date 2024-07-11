@@ -139,32 +139,51 @@ int main(int argc, char** argv) {
         safe_set.upper_bounds(1) = 0.5;
         prob->safe_sets.push_back(safe_set);
     } else {
-        prob->safe_sets.resize(5);
-        std::vector<HyperRectangle<DIM>>& safe_sets = prob->safe_sets;
-        safe_sets[0].lower_bounds(0) = -1.0;
-        safe_sets[0].upper_bounds(0) = -0.57;
-        safe_sets[0].lower_bounds(1) = -0.5;
-        safe_sets[0].upper_bounds(1) = 0.5;
+        std::list<HyperRectangle<DIM>>& safe_sets = prob->safe_sets;
+        {
+            HyperRectangle<DIM> set;
+            set.lower_bounds(0) = -1.0;
+            set.upper_bounds(0) = -0.57;
+            set.lower_bounds(1) = -0.5;
+            set.upper_bounds(1) = 0.5;
+            safe_sets.push_back(set);
+        }
 
-        safe_sets[1].lower_bounds(0) = -0.57;
-        safe_sets[1].upper_bounds(0) = -0.53;
-        safe_sets[1].lower_bounds(1) = -0.5;
-        safe_sets[1].upper_bounds(1) = -0.17;
+        {
+            HyperRectangle<DIM> set;
+            set.lower_bounds(0) = -0.57;
+            set.upper_bounds(0) = -0.53;
+            set.lower_bounds(1) = -0.5;
+            set.upper_bounds(1) = -0.17;
+            safe_sets.push_back(set);
+        }
 
-        safe_sets[2].lower_bounds(0) = -0.57;
-        safe_sets[2].upper_bounds(0) = -0.53;
-        safe_sets[2].lower_bounds(1) = -0.13;
-        safe_sets[2].upper_bounds(1) = 0.28;
+        {
+            HyperRectangle<DIM> set;
+            set.lower_bounds(0) = -0.57;
+            set.upper_bounds(0) = -0.53;
+            set.lower_bounds(1) = -0.13;
+            set.upper_bounds(1) = 0.28;
+            safe_sets.push_back(set);
+        }
 
-        safe_sets[3].lower_bounds(0) = -0.57;
-        safe_sets[3].upper_bounds(0) = -0.53;
-        safe_sets[3].lower_bounds(1) = 0.32;
-        safe_sets[3].upper_bounds(1) = 0.5;
+        {
+            HyperRectangle<DIM> set;
+            set.lower_bounds(0) = -0.57;
+            set.upper_bounds(0) = -0.53;
+            set.lower_bounds(1) = 0.32;
+            set.upper_bounds(1) = 0.5;
+            safe_sets.push_back(set);
+        }
 
-        safe_sets[4].lower_bounds(0) = -0.53;
-        safe_sets[4].upper_bounds(0) = 0.5;
-        safe_sets[4].lower_bounds(1) = -0.5;
-        safe_sets[4].upper_bounds(1) = 0.5;
+        {
+            HyperRectangle<DIM> set;
+            set.lower_bounds(0) = -0.53;
+            set.upper_bounds(0) = 0.5;
+            set.lower_bounds(1) = -0.5;
+            set.upper_bounds(1) = 0.5;
+            safe_sets.push_back(set);
+        }
     }
 
     prob->time_horizon = time_steps.get();
@@ -181,7 +200,36 @@ int main(int argc, char** argv) {
     //DEBUG("F expec[Gamma] =  \n" << F_expec_Gamma);
     //writeMatrixToFile(F_expec_Gamma, "F_expec_Gamma.txt");
 
+    //auto typeToStr = [](ConstraintType type) {
+    //    std::string s;
+    //    switch (type) {
+    //        case ConstraintType::Workspace:
+    //            s = "Workspace";
+    //            break;
+    //        case ConstraintType::Init:
+    //            s = "Init";
+    //            break;
+    //        case ConstraintType::Unsafe:
+    //            s = "Unsafe";
+    //            break;
+    //        case ConstraintType::Safe:
+    //            s = "Safe";
+    //            break;
+    //    }
+    //    return s;
+    //};
+
     ConstraintMatrices<DIM> constraints = prob->getConstraintMatrices();
+
+    //int i = 0;
+    //for (auto[type, idx] : constraints.constraint_ids) {
+    //    DEBUG("Constraint " << i++ << ", ID type: " << typeToStr(type) << ", set idx: " << idx);
+    //}
+
+    //bry_int_t idx = 1194;
+    //auto set = *prob->lookupSetFromConstraint(constraints.constraint_ids[idx]);
+    //DEBUG("Looked up constraint: " << idx << " and got set: ");
+    //printSetBounds(set);
 
     INFO("Exporting constraint matrices...");
     writeMatrixToFile(constraints.A, "A.txt");

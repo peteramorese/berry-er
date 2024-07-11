@@ -5,10 +5,22 @@
 #include "Noise.h"
 #include "LPSolver.h"
 
-#include <vector>
+#include <list>
 #include <memory>
 
 namespace BRY {
+
+enum class ConstraintType {
+    Workspace, 
+    Init, 
+    Safe, 
+    Unsafe
+};
+
+struct ConstraintID {
+    ConstraintType type;
+    bry_int_t set_idx;
+};
 
 template <std::size_t DIM>
 struct ConstraintMatrices {
@@ -26,7 +38,11 @@ struct ConstraintMatrices {
     /// @brief Degree definition of barrier
     BRY_INL bool diagDeg() const {return m_diag_deg;}
 
+    /// @brief Convert the constraints to use diagonal degree
     void toDiagonalDegree();
+
+    /// @brief Array with number elements equal to rows in `A` that identifies which set the constraint came from
+    std::vector<ConstraintID> constraint_ids;
 
     private:
         bool m_diag_deg;
@@ -42,10 +58,10 @@ struct PolyDynamicsProblem {
     std::shared_ptr<AdditiveGaussianNoise<DIM>> noise;
 
     /* Set definitions */
-    std::vector<HyperRectangle<DIM>> workspace_sets = {HyperRectangle<DIM>()};
-    std::vector<HyperRectangle<DIM>> init_sets;
-    std::vector<HyperRectangle<DIM>> safe_sets;
-    std::vector<HyperRectangle<DIM>> unsafe_sets;
+    std::list<HyperRectangle<DIM>> workspace_sets = {HyperRectangle<DIM>()};
+    std::list<HyperRectangle<DIM>> init_sets;
+    std::list<HyperRectangle<DIM>> safe_sets;
+    std::list<HyperRectangle<DIM>> unsafe_sets;
 
     /// @brief Number of time steps to verify the system for
     uint32_t time_horizon = 10;
@@ -71,6 +87,11 @@ struct PolyDynamicsProblem {
         /// @brief Compute the constraint matrices
         /// @return 
         const ConstraintMatrices<DIM> getConstraintMatrices() const;
+
+        /// @brief Given a constraint ID, get the corresponding set that the constraint belongs to
+        /// @param id ID of constraint
+        /// @return Iterator to the set in the set list corresponding to the constraint type
+        std::list<HyperRectangle<DIM>>::iterator lookupSetFromConstraint(const ConstraintID& id);
 };
 
 template <std::size_t DIM>

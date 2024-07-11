@@ -12,6 +12,7 @@ BRY::ConstraintMatrices<DIM>::ConstraintMatrices(bry_int_t n_constraints, bry_in
     : A(n_constraints, n_vars)
     , b(n_constraints)
     , barrier_deg(barrier_deg_)
+    , constraint_ids(n_constraints)
     , m_diag_deg(false)
 {
     ASSERT(A.cols() == pow(barrier_deg + 1, DIM) + 2, "Number of vars does not match barrier degree + 2");
@@ -52,10 +53,9 @@ void BRY::PolyDynamicsProblem<DIM>::subdivide(uint32_t subdivision) {
         WARN("Subdivision is less than 2 (no effect)");
         return;
     }
-    auto divide = [&] (std::vector<HyperRectangle<DIM>>& subd_sets) {
-        const std::vector<HyperRectangle<DIM>> original_sets = subd_sets;
+    auto divide = [&] (std::list<HyperRectangle<DIM>>& subd_sets) {
+        const std::list<HyperRectangle<DIM>> original_sets = subd_sets;
         subd_sets.clear();
-        subd_sets.reserve(original_sets.size() * pow(subdivision, DIM));
         for (const auto& set : original_sets) {
             std::vector<HyperRectangle<DIM>> subd_sets_to_insert = set.subdivide(subdivision);
             subd_sets.insert(subd_sets.end(), subd_sets_to_insert.begin(), subd_sets_to_insert.end());
@@ -144,6 +144,25 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
 
     constraint_matrices.A << ws_coeffs, init_coeffs, unsafe_coeffs, safe_coeffs;
     constraint_matrices.b << ws_lower_bound, init_lower_bound, unsafe_lower_bound, safe_lower_bound;
+
+    // Fill the constraint IDs
+    auto it = constraint_matrices.constraint_ids.begin();
+    for (bry_int_t set_i = 0; set_i < workspace_sets.size(); ++set_i) {
+        std::fill(it, std::next(it, Phi_m.rows()), ConstraintID{ConstraintType::Workspace, set_i});
+        std::advance(it, Phi_m.rows());
+    }
+    for (bry_int_t set_i = 0; set_i < init_sets.size(); ++set_i) {
+        std::fill(it, std::next(it, Phi_m.rows()), ConstraintID{ConstraintType::Init, set_i});
+        std::advance(it, Phi_m.rows());
+    }
+    for (bry_int_t set_i = 0; set_i < unsafe_sets.size(); ++set_i) {
+        std::fill(it, std::next(it, Phi_m.rows()), ConstraintID{ConstraintType::Unsafe, set_i});
+        std::advance(it, Phi_m.rows());
+    }
+    for (bry_int_t set_i = 0; set_i < safe_sets.size(); ++set_i) {
+        std::fill(it, std::next(it, Phi_p.rows()), ConstraintID{ConstraintType::Safe, set_i}); // Advance by Phi_p rows instead of Phi_m
+        std::advance(it, Phi_p.rows());
+    }
     
     if (diag_deg) {
         constraint_matrices.toDiagonalDegree();
@@ -151,6 +170,36 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     return constraint_matrices;
 }
 
+template <std::size_t DIM>
+std::list<BRY::HyperRectangle<DIM>>::iterator BRY::PolyDynamicsProblem<DIM>::lookupSetFromConstraint(const ConstraintID& id) {
+    switch (id.type) {
+        case ConstraintType::Workspace: {
+            #ifdef BRY_ENABLE_BOUNDS_CHECK
+                ASSERT(id.set_idx < workspace_sets.size(), "Set idx out of bounds (workspace sets)");
+            #endif
+            return std::next(workspace_sets.begin(), id.set_idx);
+        }
+        case ConstraintType::Init: {
+            #ifdef BRY_ENABLE_BOUNDS_CHECK
+                ASSERT(id.set_idx < init_sets.size(), "Set idx out of bounds (init sets)");
+            #endif
+            return std::next(init_sets.begin(), id.set_idx);
+        }
+        case ConstraintType::Unsafe: {
+            #ifdef BRY_ENABLE_BOUNDS_CHECK
+                ASSERT(id.set_idx < unsafe_sets.size(), "Set idx out of bounds (unsafe sets)");
+            #endif
+            return std::next(unsafe_sets.begin(), id.set_idx);
+        }
+        case ConstraintType::Safe: {
+            #ifdef BRY_ENABLE_BOUNDS_CHECK
+                ASSERT(id.set_idx < safe_sets.size(), "Set idx out of bounds (safe sets)");
+            #endif
+            return std::next(safe_sets.begin(), id.set_idx);
+        }
+    }
+    throw std::invalid_argument("Id is invalid");
+}
 
 template <std::size_t DIM>
 void BRY::SynthesisResult<DIM>::fromDiagonalDegree() {
