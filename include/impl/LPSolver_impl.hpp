@@ -69,23 +69,39 @@ void BRY::LPSolver::setTimeLimit(int64_t time_limit_ms) {
 }
 
 BRY::LPSolver::Result BRY::LPSolver::solve(uint32_t time_horizon) {
-    ort::MPObjective* objective = m_solver->MutableObjective();
+    m_objective = m_solver->MutableObjective();
 
     // Beta do not contribute to objective
     for (ort::MPVariable* b_i : m_b)
-        objective->SetCoefficient(b_i, 0.0);
+        m_objective->SetCoefficient(b_i, 0.0);
 
-    objective->SetCoefficient(m_eta, 1.0);
-    objective->SetCoefficient(m_gamma, static_cast<bry_float_t>(time_horizon));
-    objective->SetMinimization();
+    m_objective->SetCoefficient(m_eta, 1.0);
+    m_objective->SetCoefficient(m_gamma, static_cast<bry_float_t>(time_horizon));
+    m_objective->SetMinimization();
 
     Timer t("synthesis");
-    const ort::MPSolver::ResultStatus result_status = m_solver->Solve();
+    m_result_status = m_solver->Solve();
 
     Vector beta_values(nMonoms());
     for (bry_int_t i = 0; i < nMonoms(); ++i) {
         beta_values(i) = m_b[i]->solution_value();
     }
 
-    return Result{result_status, 1.0 - objective->Value(), m_eta->solution_value(), m_gamma->solution_value(), std::move(beta_values), t.now(TimeUnit::s)};
+    return Result{m_result_status, 1.0 - m_objective->Value(), m_eta->solution_value(), m_gamma->solution_value(), std::move(beta_values), t.now(TimeUnit::s)};
+}
+
+BRY::Vector BRY::LPSolver::getSolnVector() const {
+    if (!m_objective) {
+        ERROR("Must call solve() before obtaining solution vector");
+        return BRY::Vector{};
+    } else {
+        Vector soln_vec(nMonoms() + 2);
+        bry_int_t i = 0;
+        for (; i < nMonoms(); ++i) {
+            soln_vec(i) = m_b[i]->solution_value();
+        }
+        soln_vec(i) = m_eta->solution_value();
+        soln_vec(++i) = m_gamma->solution_value();
+        return soln_vec;
+    }
 }

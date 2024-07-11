@@ -198,7 +198,7 @@ std::list<BRY::HyperRectangle<DIM>>::iterator BRY::PolyDynamicsProblem<DIM>::loo
             return std::next(safe_sets.begin(), id.set_idx);
         }
     }
-    throw std::invalid_argument("Id is invalid");
+    throw std::invalid_argument("ID is invalid");
 }
 
 template <std::size_t DIM>
@@ -224,13 +224,7 @@ BRY::SynthesisResult<DIM> BRY::synthesize(const PolyDynamicsProblem<DIM>& proble
     
     auto constraints = problem.getConstraintMatrices();
 
-    solver.setConstraintMatrices(constraints.A, constraints.b);
-
-    BRY::SynthesisResult<DIM> result(problem.diag_deg, problem.barrier_deg);
-
-    static_cast<LPSolver::Result&>(result) = solver.solve(problem.time_horizon);
-
-    return result;
+    return synthesize(constraints, problem.time_horizon, solver_id);
 }
 
 template <std::size_t DIM>
@@ -242,8 +236,16 @@ BRY::SynthesisResult<DIM> BRY::synthesize(const ConstraintMatrices<DIM>& constra
     BRY::SynthesisResult<DIM> result(constraints.diagDeg(), constraints.barrier_deg);
 
     static_cast<LPSolver::Result&>(result) = solver.solve(time_horizon);
+    DEBUG("Solution vec: " << solver.getSolnVector().transpose());
 
     return result;
+}
+
+template <std::size_t DIM>
+BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(const PolyDynamicsProblem<DIM>& problem, bry_int_t max_iter, bry_int_t subdiv_per_iter, const std::string& solver_id) {
+    for (bry_int_t iter = 0; iter < max_iter; ++iter) {
+
+    }
 }
 
 void BRY::writeMatrixToFile(const Matrix& matrix, const std::string& filename) {

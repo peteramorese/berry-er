@@ -47,6 +47,9 @@ class LPSolver {
         /// @param time_horizon Number of timesteps to verify 
         Result solve(uint32_t time_horizon);
 
+        /// @brief Get the solution vector `v` that solves `Av >= b` once the LP has been solved
+        /// @return Solution vector in the form (b_0, ..., b_m, eta, gamma)
+        Vector getSolnVector() const;
     private:
         BRY_INL bry_int_t nMonoms() const {return m_b.size();}
 
@@ -55,6 +58,8 @@ class LPSolver {
         std::vector<ort::MPVariable*> m_b;
         ort::MPVariable* m_eta;
         ort::MPVariable* m_gamma;
+        ort::MPObjective* m_objective = nullptr;
+        ort::MPSolver::ResultStatus m_result_status;
 
         bool m_constraints_set = false;
         bry_float_t m_inf;
