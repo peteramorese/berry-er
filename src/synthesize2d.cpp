@@ -15,16 +15,16 @@ int main(int argc, char** argv) {
 
 	ArgParser parser(argc, argv);
     bool verbose = parser.parse<void>('v', "Verbose").has();
-    bool solve = parser.parse<void>('r', "Solve the synthesis problem").has();
     bool non_convex = parser.parse<void>("non-conv", "Solve the non-convex synthesis problem (default to convex)").has();
     bool adaptive = parser.parse<void>('a', "Use the adaptive subdivision algorithm").has();
+    bool export_matrices = parser.parse<void>('e', "Export the matrices to use external solvers").has();
     bool diag_deg = parser.parse<void>("diag-deg", "Use the diagonal polynomial degree definition").has();
 	auto solver_id = parser.parse<std::string>("s-id", 's', "SCIP", "Solver ID");
 	auto barrier_deg = parser.parse<bry_int_t>("deg", 'd', 4l, "Barrier degree");
 	auto deg_increase = parser.parse<bry_int_t>("deg-inc", 'i', 0l, "Barrier degree increase");
 	auto subd = parser.parse<bry_int_t>("subdiv", "Set subdivision");
-	auto ada_iters = parser.parse<bry_int_t>("ada-iters", 5, "Number of adaptive subdivision iterations (ONLY FOR ADAPTIVE)");
-	auto ada_max_subdiv = parser.parse<bry_int_t>("ada-max-subdiv", 1, "Max number of sets divided each iteration (ONLY FOR ADAPTIVE)");
+	auto ada_iters = parser.parse<bry_int_t>("ada-iters", 1l, "Number of adaptive subdivision iterations (ONLY FOR ADAPTIVE)");
+	auto ada_max_subdiv = parser.parse<bry_int_t>("ada-max-subdiv", 2l, "Max number of sets divided each iteration (ONLY FOR ADAPTIVE)");
 	auto time_steps = parser.parse<uint64_t>("ts", 't', 10, "Number of time steps");
     parser.enableHelp();
 
@@ -222,7 +222,6 @@ int main(int argc, char** argv) {
     //    return s;
     //};
 
-    ConstraintMatrices<DIM> constraints = prob->getConstraintMatrices();
 
     //int i = 0;
     //for (auto[type, idx] : constraints.constraint_ids) {
@@ -234,33 +233,35 @@ int main(int argc, char** argv) {
     //DEBUG("Looked up constraint: " << idx << " and got set: ");
     //printSetBounds(set);
 
-    INFO("Exporting constraint matrices...");
-    writeMatrixToFile(constraints.A, "A.txt");
-    writeMatrixToFile(constraints.b, "b.txt");
-    INFO("Done!");
-
-    if (solve) {
-        INFO("Solving...");
-        
-        if (adaptive) {
-            SynthesisResult<DIM> result = synthesizeAdaptive(*prob, ada_iters.get(), ada_max_subdiv.get(), solver_id.get());
-        } else {
-            SynthesisResult<DIM> result = synthesize(constraints, prob->time_horizon, solver_id.get());
-        }
+    if (export_matrices) {
+        ConstraintMatrices<DIM> constraints = prob->getConstraintMatrices();
+        INFO("Exporting constraint matrices...");
+        writeMatrixToFile(constraints.A, "A.txt");
+        writeMatrixToFile(constraints.b, "b.txt");
         INFO("Done!");
-        NEW_LINE;
-        INFO("Probability of safety: " << result.p_safe);
-
-        printf("Eta = %.32f\n", result.eta);
-        printf("Gamma = %.32f\n", result.gamma);
-        //INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
-        INFO("Computation time: " << result.comp_time << "s");
-
-        if (result.diagDeg())
-            result.fromDiagonalDegree();
-
-        writeMatrixToFile(result.b_values, "certificate_coeffs.txt");
     }
+
+    INFO("Solving...");
+    SynthesisResult<DIM> result;
+    if (adaptive) {
+        DEBUG("max subdiv: " << ada_max_subdiv.get());
+        result = synthesizeAdaptive(*prob, ada_iters.get(), ada_max_subdiv.get(), solver_id.get());
+    } else {
+        result = synthesize(*prob, solver_id.get());
+    }
+    INFO("Done!");
+    NEW_LINE;
+    INFO("Probability of safety: " << result.p_safe);
+
+    printf("Eta = %.32f\n", result.eta);
+    printf("Gamma = %.32f\n", result.gamma);
+    //INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
+    INFO("Computation time: " << result.comp_time << "s");
+
+    if (result.diagDeg())
+        result.fromDiagonalDegree();
+
+    writeMatrixToFile(result.b_values, "certificate_coeffs.txt");
 
 
     return 0;

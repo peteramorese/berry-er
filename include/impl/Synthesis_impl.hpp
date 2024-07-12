@@ -73,6 +73,11 @@ void BRY::PolyDynamicsProblem<DIM>::subdivide(uint32_t subdivision) {
 }
 
 template <std::size_t DIM>
+BRY::bry_int_t BRY::PolyDynamicsProblem<DIM>::numSets() const {
+    return workspace_sets.size() + init_sets.size() + unsafe_sets.size() + safe_sets.size();
+}
+
+template <std::size_t DIM>
 const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices() const {
 
     Matrix Phi_m = BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, degree_increase);
@@ -182,28 +187,24 @@ std::list<BRY::HyperRectangle<DIM>>::iterator BRY::PolyDynamicsProblem<DIM>::loo
             #ifdef BRY_ENABLE_BOUNDS_CHECK
                 ASSERT(id.set_idx < workspace_sets.size(), "Set idx out of bounds (workspace sets)");
             #endif
-            DEBUG("WS returning it: " << &*std::next(workspace_sets.begin(), id.set_idx));
             return std::next(workspace_sets.begin(), id.set_idx);
         }
         case ConstraintType::Init: {
             #ifdef BRY_ENABLE_BOUNDS_CHECK
                 ASSERT(id.set_idx < init_sets.size(), "Set idx out of bounds (init sets)");
             #endif
-            DEBUG("INIT returning it: " << &*std::next(init_sets.begin(), id.set_idx));
             return std::next(init_sets.begin(), id.set_idx);
         }
         case ConstraintType::Unsafe: {
             #ifdef BRY_ENABLE_BOUNDS_CHECK
                 ASSERT(id.set_idx < unsafe_sets.size(), "Set idx out of bounds (unsafe sets)");
             #endif
-            DEBUG("UNSF returning it: " << &*std::next(unsafe_sets.begin(), id.set_idx));
             return std::next(unsafe_sets.begin(), id.set_idx);
         }
         case ConstraintType::Safe: {
             #ifdef BRY_ENABLE_BOUNDS_CHECK
                 ASSERT(id.set_idx < safe_sets.size(), "Set idx out of bounds (safe sets)");
             #endif
-            DEBUG("SF returning it: " << &*std::next(safe_sets.begin(), id.set_idx));
             return std::next(safe_sets.begin(), id.set_idx);
         }
     }
@@ -245,7 +246,8 @@ BRY::SynthesisResult<DIM> BRY::synthesize(const ConstraintMatrices<DIM>& constra
 }
 
 template <std::size_t DIM>
-BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(PolyDynamicsProblem<DIM> problem, bry_int_t max_iter, bry_int_t max_subdiv_per_iter, const std::string& solver_id) {
+BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(PolyDynamicsProblem<DIM> problem, bry_int_t max_iter, bry_int_t subdiv_per_iter, const std::string& solver_id) {
+    ASSERT(subdiv_per_iter >= 1, "subdiv_per_iter must be geq than 1");
     BRY::SynthesisResult<DIM> result(problem.diag_deg, problem.barrier_deg);
     for (bry_int_t iter = 0; iter < max_iter; ++iter) {
         LPSolver solver(solver_id);
@@ -264,13 +266,14 @@ BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(PolyDynamicsProblem<DIM> probl
         // Compute the smallest max_subdiv_per_iter robustness values
         Vector soln_vec = solver.getSolnVector();
         Vector robustness_values = constraints.computeRobustnessVec(soln_vec);
+        ASSERT(subdiv_per_iter < problem.numSets(), "Number of subdivisions per iter is more than the number of sets");
         std::vector<bry_int_t> robustness_indices(robustness_values.size());
         for (bry_int_t i = 0; i < robustness_indices.size(); ++i) {
             robustness_indices[i] = i;
         }
 
         // Sort the robustness values
-        std::partial_sort(robustness_indices.begin(), robustness_indices.begin() + max_subdiv_per_iter, robustness_indices.end(),
+        std::sort(robustness_indices.begin(), robustness_indices.end(),
             [&robustness_values](bry_int_t lhs, bry_int_t rhs){return robustness_values[lhs] < robustness_values[rhs];});
 
         // Determine the sets that have the lowest robustness values
@@ -281,23 +284,35 @@ BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(PolyDynamicsProblem<DIM> probl
         std::set<typename std::list<HyperRectangle<DIM>>::iterator, decltype(comp)> init_sets_to_subd(comp);
         std::set<typename std::list<HyperRectangle<DIM>>::iterator, decltype(comp)> unsf_sets_to_subd(comp);
         std::set<typename std::list<HyperRectangle<DIM>>::iterator, decltype(comp)> sf_sets_to_subd(comp);
-        for (bry_int_t i = 0; i < max_subdiv_per_iter; ++i) {
-            const ConstraintID& id = constraints.constraint_ids[robustness_indices[i]];
+        bry_int_t num_sets_to_subd = 0;
+        for (bry_int_t robustness_idx : robustness_indices) {
+            const ConstraintID& id = constraints.constraint_ids[robustness_idx];
             auto it = problem.lookupSetFromConstraint(id);
-
+            bool inserted = false;
             switch (id.type) {
                 case ConstraintType::Workspace:
-                    ws_sets_to_subd.insert(it);
+                    inserted = ws_sets_to_subd.insert(it).second;
+                    DEBUG("Subd ws set: " <<  id.set_idx);
                     break;
                 case ConstraintType::Init: 
-                    init_sets_to_subd.insert(it);
+                    inserted = init_sets_to_subd.insert(it).second;
+                    DEBUG("Subd init set: " <<  id.set_idx);
                     break;
                 case ConstraintType::Unsafe:
-                    unsf_sets_to_subd.insert(it);
+                    inserted = unsf_sets_to_subd.insert(it).second;
+                    DEBUG("Subd unsafe set: " <<  id.set_idx);
                     break;
                 case ConstraintType::Safe:
-                    sf_sets_to_subd.insert(it);
+                    inserted = sf_sets_to_subd.insert(it).second;
+                    DEBUG("Subd safe set: " <<  id.set_idx);
                     break;
+            }
+
+            if (inserted) {
+                ++num_sets_to_subd;
+                if (num_sets_to_subd >= subdiv_per_iter) {
+                    break;
+                }
             }
         }
 
@@ -320,6 +335,23 @@ BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(PolyDynamicsProblem<DIM> probl
             // Insert the subdivided sets
             list_of_sets.insert(following_it, subdivisions.begin(), subdivisions.end());
         };
+
+        if (iter >= 1) {
+            //for (uint32_t i = 0; i < robustness_indices.size(); ++i) {
+            //    ConstraintID id = constraints.constraint_ids[robustness_indices[i]];
+            //    DEBUG("Robustness val" << i << " " << robustness_values[robustness_indices[i]] << " set type: " << (uint32_t)id.type << " idx: " << id.set_idx);
+            //}
+
+            DEBUG("TESTING! ACTUALLY DIVIDING type: " << (uint32_t)ConstraintType::Safe << " set: 2");
+            auto it = problem.lookupSetFromConstraint(ConstraintID{ConstraintType::Safe, 2});
+            subdivideAndReplace(problem.safe_sets, it);
+
+            //DEBUG("TESTING! ACTUALLY DIVIDING Unsafe set 0");
+            //auto it = problem.lookupSetFromConstraint(ConstraintID{ConstraintType::Unsafe, 0});
+            //subdivideAndReplace(problem.unsafe_sets, it);
+
+            continue;
+        }
 
         for (auto it : ws_sets_to_subd) {
             subdivideAndReplace(problem.workspace_sets, it);

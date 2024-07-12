@@ -10,11 +10,11 @@
 
 namespace BRY {
 
-enum class ConstraintType {
-    Workspace, 
+enum ConstraintType {
+    Workspace = 0, 
     Init, 
+    Unsafe,
     Safe, 
-    Unsafe
 };
 
 struct ConstraintID {
@@ -68,8 +68,8 @@ struct PolyDynamicsProblem {
     /* Set definitions */
     std::list<HyperRectangle<DIM>> workspace_sets = {HyperRectangle<DIM>()};
     std::list<HyperRectangle<DIM>> init_sets;
-    std::list<HyperRectangle<DIM>> safe_sets;
     std::list<HyperRectangle<DIM>> unsafe_sets;
+    std::list<HyperRectangle<DIM>> safe_sets;
 
     /// @brief Number of time steps to verify the system for
     uint32_t time_horizon = 10;
@@ -92,6 +92,10 @@ struct PolyDynamicsProblem {
         /// @param subdivision Integer number of subdivisions along one dimension
         void subdivide(uint32_t subdivision);
 
+        /// @brief Get the total number of sets across workspace, init, unsafe, and safe.
+        /// @return 
+        BRY_INL bry_int_t numSets() const;
+
         /// @brief Compute the constraint matrices
         /// @return 
         const ConstraintMatrices<DIM> getConstraintMatrices() const;
@@ -104,6 +108,7 @@ struct PolyDynamicsProblem {
 
 template <std::size_t DIM>
 struct SynthesisResult : public LPSolver::Result {
+    SynthesisResult() = default;
     SynthesisResult(bool diag_deg, bry_int_t barrier_deg_) : m_diag_deg(diag_deg), barrier_deg(barrier_deg_) {}
 
     /// @brief Degree definition of barrier
@@ -111,10 +116,10 @@ struct SynthesisResult : public LPSolver::Result {
 
     void fromDiagonalDegree();
 
-    const bry_int_t barrier_deg;
+    bry_int_t barrier_deg = 0;
 
     private:
-        bool m_diag_deg;
+        bool m_diag_deg = false;
 };
 
 template <std::size_t DIM>
@@ -124,7 +129,7 @@ template <std::size_t DIM>
 SynthesisResult<DIM> synthesize(const ConstraintMatrices<DIM>& constraints, bry_int_t time_horizon, const std::string& solver_id = "clp");
 
 template <std::size_t DIM>
-SynthesisResult<DIM> synthesizeAdaptive(PolyDynamicsProblem<DIM> problem, bry_int_t max_iter, bry_int_t max_subdiv_per_iter, const std::string& solver_id = "clp");
+SynthesisResult<DIM> synthesizeAdaptive(PolyDynamicsProblem<DIM> problem, bry_int_t max_iter, bry_int_t subdiv_per_iter, const std::string& solver_id = "clp");
 
 void writeMatrixToFile(const Matrix& matrix, const std::string& filename);
 
