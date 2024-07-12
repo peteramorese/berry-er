@@ -43,6 +43,11 @@ void BRY::ConstraintMatrices<DIM>::toDiagonalDegree() {
 }
 
 template <std::size_t DIM>
+BRY::Vector BRY::ConstraintMatrices<DIM>::computeRobustnessVec(const Vector& soln_vec) const {
+    return A * soln_vec - b;
+}
+
+template <std::size_t DIM>
 void BRY::PolyDynamicsProblem<DIM>::setWorkspace(const HyperRectangle<DIM>& workspace) {
     workspace_sets = {workspace};
 }
@@ -177,24 +182,28 @@ std::list<BRY::HyperRectangle<DIM>>::iterator BRY::PolyDynamicsProblem<DIM>::loo
             #ifdef BRY_ENABLE_BOUNDS_CHECK
                 ASSERT(id.set_idx < workspace_sets.size(), "Set idx out of bounds (workspace sets)");
             #endif
+            DEBUG("WS returning it: " << &*std::next(workspace_sets.begin(), id.set_idx));
             return std::next(workspace_sets.begin(), id.set_idx);
         }
         case ConstraintType::Init: {
             #ifdef BRY_ENABLE_BOUNDS_CHECK
                 ASSERT(id.set_idx < init_sets.size(), "Set idx out of bounds (init sets)");
             #endif
+            DEBUG("INIT returning it: " << &*std::next(init_sets.begin(), id.set_idx));
             return std::next(init_sets.begin(), id.set_idx);
         }
         case ConstraintType::Unsafe: {
             #ifdef BRY_ENABLE_BOUNDS_CHECK
                 ASSERT(id.set_idx < unsafe_sets.size(), "Set idx out of bounds (unsafe sets)");
             #endif
+            DEBUG("UNSF returning it: " << &*std::next(unsafe_sets.begin(), id.set_idx));
             return std::next(unsafe_sets.begin(), id.set_idx);
         }
         case ConstraintType::Safe: {
             #ifdef BRY_ENABLE_BOUNDS_CHECK
                 ASSERT(id.set_idx < safe_sets.size(), "Set idx out of bounds (safe sets)");
             #endif
+            DEBUG("SF returning it: " << &*std::next(safe_sets.begin(), id.set_idx));
             return std::next(safe_sets.begin(), id.set_idx);
         }
     }
@@ -221,31 +230,135 @@ void BRY::SynthesisResult<DIM>::fromDiagonalDegree() {
 template <std::size_t DIM>
 BRY::SynthesisResult<DIM> BRY::synthesize(const PolyDynamicsProblem<DIM>& problem, const std::string& solver_id) {
     LPSolver solver(solver_id);
-    
     auto constraints = problem.getConstraintMatrices();
-
     return synthesize(constraints, problem.time_horizon, solver_id);
 }
 
 template <std::size_t DIM>
 BRY::SynthesisResult<DIM> BRY::synthesize(const ConstraintMatrices<DIM>& constraints, bry_int_t time_horizon, const std::string& solver_id) {
     LPSolver solver(solver_id);
-    
     solver.setConstraintMatrices(constraints.A, constraints.b);
 
     BRY::SynthesisResult<DIM> result(constraints.diagDeg(), constraints.barrier_deg);
-
     static_cast<LPSolver::Result&>(result) = solver.solve(time_horizon);
-    DEBUG("Solution vec: " << solver.getSolnVector().transpose());
-
     return result;
 }
 
 template <std::size_t DIM>
-BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(const PolyDynamicsProblem<DIM>& problem, bry_int_t max_iter, bry_int_t subdiv_per_iter, const std::string& solver_id) {
+BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(PolyDynamicsProblem<DIM> problem, bry_int_t max_iter, bry_int_t max_subdiv_per_iter, const std::string& solver_id) {
+    BRY::SynthesisResult<DIM> result(problem.diag_deg, problem.barrier_deg);
     for (bry_int_t iter = 0; iter < max_iter; ++iter) {
+        LPSolver solver(solver_id);
+        ConstraintMatrices<DIM> constraints = problem.getConstraintMatrices();
+        solver.setConstraintMatrices(constraints.A, constraints.b);
+
+        static_cast<LPSolver::Result&>(result) = solver.solve(problem.time_horizon);
+
+        NEW_LINE;
+        INFO("Iteration " << iter + 1 << " / " << max_iter << " p_safe = " << result.p_safe);
+
+        if (iter == max_iter - 1) {
+            break;
+        }
+
+        // Compute the smallest max_subdiv_per_iter robustness values
+        Vector soln_vec = solver.getSolnVector();
+        Vector robustness_values = constraints.computeRobustnessVec(soln_vec);
+        std::vector<bry_int_t> robustness_indices(robustness_values.size());
+        for (bry_int_t i = 0; i < robustness_indices.size(); ++i) {
+            robustness_indices[i] = i;
+        }
+
+        // Sort the robustness values
+        std::partial_sort(robustness_indices.begin(), robustness_indices.begin() + max_subdiv_per_iter, robustness_indices.end(),
+            [&robustness_values](bry_int_t lhs, bry_int_t rhs){return robustness_values[lhs] < robustness_values[rhs];});
+
+        // Determine the sets that have the lowest robustness values
+        auto comp = [](const typename std::list<HyperRectangle<DIM>>::iterator& lhs, const typename std::list<HyperRectangle<DIM>>::iterator& rhs) -> bool {
+            return &(*lhs) < &(*rhs);
+        };
+        std::set<typename std::list<HyperRectangle<DIM>>::iterator, decltype(comp)> ws_sets_to_subd(comp);
+        std::set<typename std::list<HyperRectangle<DIM>>::iterator, decltype(comp)> init_sets_to_subd(comp);
+        std::set<typename std::list<HyperRectangle<DIM>>::iterator, decltype(comp)> unsf_sets_to_subd(comp);
+        std::set<typename std::list<HyperRectangle<DIM>>::iterator, decltype(comp)> sf_sets_to_subd(comp);
+        for (bry_int_t i = 0; i < max_subdiv_per_iter; ++i) {
+            const ConstraintID& id = constraints.constraint_ids[robustness_indices[i]];
+            auto it = problem.lookupSetFromConstraint(id);
+
+            switch (id.type) {
+                case ConstraintType::Workspace:
+                    ws_sets_to_subd.insert(it);
+                    break;
+                case ConstraintType::Init: 
+                    init_sets_to_subd.insert(it);
+                    break;
+                case ConstraintType::Unsafe:
+                    unsf_sets_to_subd.insert(it);
+                    break;
+                case ConstraintType::Safe:
+                    sf_sets_to_subd.insert(it);
+                    break;
+            }
+        }
+
+        // Subdivide the marked sets by removing the original set and adding the subdivided sets
+        auto subdivideAndReplace = [](std::list<HyperRectangle<DIM>>& list_of_sets, std::list<HyperRectangle<DIM>>::iterator it_to_subd) {
+            //DEBUG("removing it: " << &*it_to_subd);
+            //bool found = false;
+            //for (auto it = list_of_sets.begin(); it != list_of_sets.end(); ++it) {
+            //    if (it == it_to_subd) {
+            //        found = true;
+            //        break;
+            //    }
+            //}
+            //ASSERT(found, "Iterator not found");
+
+            // Subdivide in 2
+            std::vector<HyperRectangle<DIM>> subdivisions = it_to_subd->subdivide(2);
+            // Erase the original set
+            auto following_it = list_of_sets.erase(it_to_subd);
+            // Insert the subdivided sets
+            list_of_sets.insert(following_it, subdivisions.begin(), subdivisions.end());
+        };
+
+        for (auto it : ws_sets_to_subd) {
+            subdivideAndReplace(problem.workspace_sets, it);
+        }
+        for (auto it : init_sets_to_subd) {
+            subdivideAndReplace(problem.init_sets, it);
+        }
+        for (auto it : unsf_sets_to_subd) {
+            subdivideAndReplace(problem.unsafe_sets, it);
+        }
+        for (auto it : sf_sets_to_subd) {
+            subdivideAndReplace(problem.safe_sets, it);
+        }
+        //auto printSetBounds = [](const HyperRectangle<DIM>& set) {
+        //    DEBUG("Set bounds: [" 
+        //        << set.lower_bounds(0) << ", " 
+        //        << set.upper_bounds(0) << ", "
+        //        << set.lower_bounds(1) << ", " 
+        //        << set.upper_bounds(1) << "]");
+        //};
+
+        //DEBUG("Original list:");
+        //for (auto set : problem.unsafe_sets) {
+        //    printSetBounds(set);
+        //}
+        //NEW_LINE;
+        //auto test_it = ++problem.unsafe_sets.begin();
+        //DEBUG("Set to remove:");
+        //printSetBounds(*test_it);
+        //subdivideAndReplace(problem.unsafe_sets, test_it);
+        //NEW_LINE;
+
+        //DEBUG("Edited list:");
+        //for (auto set : problem.unsafe_sets) {
+        //    printSetBounds(set);
+        //}
 
     }
+    return result;
 }
 
 void BRY::writeMatrixToFile(const Matrix& matrix, const std::string& filename) {

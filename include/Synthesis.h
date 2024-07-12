@@ -33,7 +33,11 @@ struct ConstraintMatrices {
     /// @brief Lower bound vector `b` in `Ax >= b`
     Vector b;
 
+    /// @brief Degree of barrier
     const bry_int_t barrier_deg;
+
+    /// @brief Array with number elements equal to rows in `A` that identifies which set the constraint came from
+    std::vector<ConstraintID> constraint_ids;
 
     /// @brief Degree definition of barrier
     BRY_INL bool diagDeg() const {return m_diag_deg;}
@@ -41,8 +45,12 @@ struct ConstraintMatrices {
     /// @brief Convert the constraints to use diagonal degree
     void toDiagonalDegree();
 
-    /// @brief Array with number elements equal to rows in `A` that identifies which set the constraint came from
-    std::vector<ConstraintID> constraint_ids;
+    /// @brief Compute the constraint robustness vector equal to `Av - b` where `v` is the solution vector. If
+    /// the solution vector adheres to the constraints, the elements of the returned vector will be non-negative
+    /// @param soln_vec Solution vector that optimizes the LP problem
+    /// @return Robustness vector of size equal to number of rows in `A` where each element corresponds 
+    /// to the robustness of a given constraint. 
+    Vector computeRobustnessVec(const Vector& soln_vec) const;
 
     private:
         bool m_diag_deg;
@@ -116,7 +124,7 @@ template <std::size_t DIM>
 SynthesisResult<DIM> synthesize(const ConstraintMatrices<DIM>& constraints, bry_int_t time_horizon, const std::string& solver_id = "clp");
 
 template <std::size_t DIM>
-SynthesisResult<DIM> synthesizeAdaptive(const PolyDynamicsProblem<DIM>& problem, bry_int_t max_iter, bry_int_t subdiv_per_iter, const std::string& solver_id = "clp");
+SynthesisResult<DIM> synthesizeAdaptive(PolyDynamicsProblem<DIM> problem, bry_int_t max_iter, bry_int_t max_subdiv_per_iter, const std::string& solver_id = "clp");
 
 void writeMatrixToFile(const Matrix& matrix, const std::string& filename);
 

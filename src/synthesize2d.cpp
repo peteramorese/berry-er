@@ -17,11 +17,14 @@ int main(int argc, char** argv) {
     bool verbose = parser.parse<void>('v', "Verbose").has();
     bool solve = parser.parse<void>('r', "Solve the synthesis problem").has();
     bool non_convex = parser.parse<void>("non-conv", "Solve the non-convex synthesis problem (default to convex)").has();
+    bool adaptive = parser.parse<void>('a', "Use the adaptive subdivision algorithm").has();
     bool diag_deg = parser.parse<void>("diag-deg", "Use the diagonal polynomial degree definition").has();
 	auto solver_id = parser.parse<std::string>("s-id", 's', "SCIP", "Solver ID");
 	auto barrier_deg = parser.parse<bry_int_t>("deg", 'd', 4l, "Barrier degree");
 	auto deg_increase = parser.parse<bry_int_t>("deg-inc", 'i', 0l, "Barrier degree increase");
 	auto subd = parser.parse<bry_int_t>("subdiv", "Set subdivision");
+	auto ada_iters = parser.parse<bry_int_t>("ada-iters", 5, "Number of adaptive subdivision iterations (ONLY FOR ADAPTIVE)");
+	auto ada_max_subdiv = parser.parse<bry_int_t>("ada-max-subdiv", 1, "Max number of sets divided each iteration (ONLY FOR ADAPTIVE)");
 	auto time_steps = parser.parse<uint64_t>("ts", 't', 10, "Number of time steps");
     parser.enableHelp();
 
@@ -239,7 +242,11 @@ int main(int argc, char** argv) {
     if (solve) {
         INFO("Solving...");
         
-        auto result = synthesize(constraints, prob->time_horizon, solver_id.get());
+        if (adaptive) {
+            SynthesisResult<DIM> result = synthesizeAdaptive(*prob, ada_iters.get(), ada_max_subdiv.get(), solver_id.get());
+        } else {
+            SynthesisResult<DIM> result = synthesize(constraints, prob->time_horizon, solver_id.get());
+        }
         INFO("Done!");
         NEW_LINE;
         INFO("Probability of safety: " << result.p_safe);
