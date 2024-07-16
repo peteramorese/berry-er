@@ -22,17 +22,29 @@ BRY::ConstraintMatrices<DIM>::ConstraintMatrices(bry_int_t n_constraints, bry_in
     , b(n_constraints)
     , barrier_deg(barrier_deg_)
     , constraint_ids(n_constraints)
-    , m_diag_deg(false)
+    , m_filter_applied(false)
 {
     ASSERT(A.cols() == pow(barrier_deg + 1, DIM) + 2, "Number of vars does not match barrier degree + 2");
 }
 
 template <std::size_t DIM>
-void BRY::ConstraintMatrices<DIM>::toDiagonalDegree() {
-    if (m_diag_deg) {
-        WARN("Already in using diagonal degree form");
+BRY::ConstraintMatrices<DIM>::ConstraintMatrices(bry_int_t n_constraints, bry_int_t n_vars, bry_int_t barrier_deg_, const std::shared_ptr<MonomialFilter<DIM>>& filter_)
+    : A(n_constraints, n_vars)
+    , b(n_constraints)
+    , barrier_deg(barrier_deg_)
+    , constraint_ids(n_constraints)
+    , filter(filter_)
+    , m_filter_applied(false)
+{
+    ASSERT(A.cols() == pow(barrier_deg + 1, DIM) + 2, "Number of vars does not match barrier degree + 2");
+}
+
+template <std::size_t DIM>
+void BRY::ConstraintMatrices<DIM>::applyFilter() {
+    if (m_filter_applied) {
         return;
     }
+
     bry_int_t n_coeffs = pow(barrier_deg + 1, DIM);
 
     auto removeCol = [](Eigen::MatrixXd& m, int col) {
@@ -44,11 +56,11 @@ void BRY::ConstraintMatrices<DIM>::toDiagonalDegree() {
     bry_int_t cols_removed = 0;
 
     for (auto col_midx = mIdxW(DIM, barrier_deg + 1); !col_midx.last(); ++col_midx) {
-        if (std::accumulate(col_midx.begin(), col_midx.end(), 0) > barrier_deg) {
+        if (filter->remove(col_midx.begin())) {
             removeCol(A, col_midx.inc().wrappedIdx() - cols_removed++);
         }
     }
-    m_diag_deg = true;
+    m_filter_applied = true;
 }
 
 template <std::size_t DIM>
@@ -211,9 +223,9 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     }
 
     constraint_matrices.transformation_matrices = std::move(cached_constraint_matrices);
-    
-    if (diag_deg) {
-        constraint_matrices.toDiagonalDegree();
+    constraint_matrices.filter = filter;
+    if (filter) {
+        constraint_matrices.applyFilter();
     }
     return constraint_matrices;
 }
@@ -250,32 +262,28 @@ std::list<BRY::HyperRectangle<DIM>>::iterator BRY::PolyDynamicsProblem<DIM>::loo
 }
 
 template <std::size_t DIM>
-BRY::SynthesisResult<DIM> BRY::SynthesisResult<DIM>::fromDiagonalDegree() const {
-    if (!m_diag_deg) {
-        WARN("Result is already in diagonal degree form");
-        return *this;
+void BRY::SynthesisResult<DIM>::removeFilter() {
+    if (!filter) {
+        return;
     }
-    bry_int_t n_coeffs = pow(barrier_deg + 1, DIM);
-    ASSERT(b_values.size() != n_coeffs, "Supplied coefficient vector is already in square-degree form");
-    Vector sq_coeffs = Vector::Zero(n_coeffs);
 
+    bry_int_t n_coeffs = pow(barrier_deg + 1, DIM);
+    ASSERT(b_values.size() != n_coeffs, "Supplied coefficient vector is already in square-degree form (no filter is applied)");
+
+    Vector sq_coeffs = Vector::Zero(n_coeffs);
     bry_int_t i = 0;
 
     for (auto col_midx = mIdxW(DIM, barrier_deg + 1); !col_midx.last(); ++col_midx) {
-        if (std::accumulate(col_midx.begin(), col_midx.end(), 0) <= barrier_deg) {
+        if (!filter->remove(col_midx.begin())) {
             sq_coeffs(col_midx.inc().wrappedIdx()) = b_values(i++);
         }
     }
 
-    SynthesisResult new_result = *this;
-    new_result.b_values = sq_coeffs;
-    new_result.m_diag_deg = false;
-    return new_result;
+    b_values = sq_coeffs;
 }
 
 template <std::size_t DIM>
 BRY::SynthesisResult<DIM> BRY::synthesize(const PolyDynamicsProblem<DIM>& problem, const std::string& solver_id) {
-    LPSolver solver(solver_id);
     auto constraints = problem.getConstraintMatrices();
     return synthesize(constraints, problem.time_horizon, solver_id);
 }
@@ -285,7 +293,7 @@ BRY::SynthesisResult<DIM> BRY::synthesize(const ConstraintMatrices<DIM>& constra
     LPSolver solver(solver_id);
     solver.setConstraintMatrices(constraints.A, constraints.b);
 
-    BRY::SynthesisResult<DIM> result(constraints.diagDeg(), constraints.barrier_deg);
+    BRY::SynthesisResult<DIM> result(constraints.barrier_deg, constraints.filter);
     static_cast<LPSolver::Result&>(result) = solver.solve(time_horizon);
     return result;
 }
@@ -300,7 +308,7 @@ BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(PolyDynamicsProblem<DIM> probl
         ConstraintMatrices<DIM> constraints = problem.getConstraintMatrices(true);
         solver.setConstraintMatrices(constraints.A, constraints.b);
 
-        BRY::SynthesisResult<DIM> result(problem.diag_deg, problem.barrier_deg);
+        BRY::SynthesisResult<DIM> result(constraints.barrier_deg, constraints.filter);
         static_cast<LPSolver::Result&>(result) = solver.solve(problem.time_horizon);
 
         NEW_LINE;
@@ -310,8 +318,8 @@ BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(PolyDynamicsProblem<DIM> probl
             return result;
         }
 
-        if (result.diagDeg()) {
-            result = result.fromDiagonalDegree();
+        if (result.isFilterApplied()) {
+            result.removeFilter();
         }
         Polynomial<DIM> barrier(result.b_values);
 

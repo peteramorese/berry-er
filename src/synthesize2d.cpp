@@ -78,8 +78,6 @@ int main(int argc, char** argv) {
     //DEBUG("Init set:");
     //printSetBounds(init_set);
     
-    NEW_LINE;
-
     //DEBUG("Unsafe sets:");
     // Unsafe set
     HyperRectangle<DIM> boundary_left;
@@ -192,7 +190,9 @@ int main(int argc, char** argv) {
     prob->time_horizon = time_steps.get();
     prob->barrier_deg = barrier_deg.get();
     prob->degree_increase = deg_increase.get();
-    prob->diag_deg = diag_deg;
+    if (diag_deg) {
+        prob->filter = std::make_shared<DiagDegFilter<DIM>>(barrier_deg.get());
+    }
 
     if (subd.has()) {
         INFO("Subdividing in " << subd.get());
@@ -244,7 +244,6 @@ int main(int argc, char** argv) {
     INFO("Solving...");
     SynthesisResult<DIM> result;
     if (adaptive) {
-        DEBUG("max subdiv: " << ada_max_subdiv.get());
         result = synthesizeAdaptive(*prob, ada_iters.get(), ada_max_subdiv.get(), solver_id.get());
     } else {
         result = synthesize(*prob, solver_id.get());
@@ -258,8 +257,9 @@ int main(int argc, char** argv) {
     //INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
     INFO("Computation time: " << result.comp_time << "s");
 
-    if (result.diagDeg())
-        result.fromDiagonalDegree();
+    if (result.isFilterApplied()) {
+        result.removeFilter();
+    }
 
     writeMatrixToFile(result.b_values, "certificate_coeffs.txt");
 

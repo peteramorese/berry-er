@@ -4,6 +4,7 @@
 #include "Dynamics.h"
 #include "Noise.h"
 #include "LPSolver.h"
+#include "MonomialFilter.h"
 
 #include <list>
 #include <memory>
@@ -27,7 +28,19 @@ struct ConstraintID {
 
 template <std::size_t DIM>
 struct ConstraintMatrices {
+    /// @brief Construct constraint matrices
+    /// @param n_constraints Number of constriants
+    /// @param n_vars Number of variables (number of monomial coefficients)
+    /// @param barrier_deg_ Degree of the barrier
     ConstraintMatrices(bry_int_t n_constraints, bry_int_t n_vars, bry_int_t barrier_deg_);
+
+    /// @brief Construct constraint matrices
+    /// @param n_constraints Number of constriants
+    /// @param n_vars Number of variables (number of monomial coefficients)
+    /// @param barrier_deg_ Degree of the barrier
+    /// @param filter Filter to apply to reduce the number of variables
+    ConstraintMatrices(bry_int_t n_constraints, bry_int_t n_vars, bry_int_t barrier_deg_, const std::shared_ptr<MonomialFilter<DIM>>& filter_);
+
     ConstraintMatrices() = delete;
 
     /// @brief Constraint matrix `A` in `Ax >= b` where columns represent variables [b_0, ..., b_m, eta, gamma]
@@ -39,6 +52,9 @@ struct ConstraintMatrices {
     /// @brief Degree of barrier
     const bry_int_t barrier_deg;
 
+    /// @brief Filter to apply to remove variables
+    std::shared_ptr<MonomialFilter<DIM>> filter;
+
     /// @brief Array with number elements equal to rows in `A` that identifies which set the constraint came from
     std::vector<ConstraintID> constraint_ids;
 
@@ -48,11 +64,12 @@ struct ConstraintMatrices {
     /// `PolyDynamicsProblem::getConstraintMatrices()`)
     std::unique_ptr<std::map<ConstraintID, Matrix>> transformation_matrices;
 
-    /// @brief Degree definition of barrier
-    BRY_INL bool diagDeg() const {return m_diag_deg;}
+    /// @brief Determine if a filter has been applied to the matrices
+    /// @return `true` if filter has been applied
+    BRY_INL bool isFilterApplied() const {return m_filter_applied;}
 
-    /// @brief Convert the constraints to use diagonal degree
-    void toDiagonalDegree();
+    /// @brief Apply the current filter if one was supplied (otherwise do nothing)
+    void applyFilter();
 
     /// @brief Compute the constraint robustness vector equal to `Av - b` where `v` is the solution vector. If
     /// the solution vector adheres to the constraints, the elements of the returned vector will be non-negative
@@ -62,7 +79,7 @@ struct ConstraintMatrices {
     Vector computeRobustnessVec(const Vector& soln_vec) const;
 
     private:
-        bool m_diag_deg;
+        bool m_filter_applied;
 };
 
 template <std::size_t DIM>
@@ -89,8 +106,8 @@ struct PolyDynamicsProblem {
     /// @brief Increase the degree of the power-Bernstein conversion to reduce the conservativeness
     bry_int_t degree_increase = 0;
 
-    /// @brief Use the diagonal degree definition of the certificate
-    bool diag_deg = false;
+    /// @brief Monomial filter to apply to the constraints. If nullptr, no filter will be applied
+    std::shared_ptr<MonomialFilter<DIM>> filter = nullptr;
 
     public:
         /// @brief Helper for setting the workspace from a single set
@@ -119,17 +136,17 @@ struct PolyDynamicsProblem {
 template <std::size_t DIM>
 struct SynthesisResult : public LPSolver::Result {
     SynthesisResult() = default;
-    SynthesisResult(bool diag_deg, bry_int_t barrier_deg_) : m_diag_deg(diag_deg), barrier_deg(barrier_deg_) {}
+    SynthesisResult(bry_int_t barrier_deg_) : barrier_deg(barrier_deg_) {}
+    SynthesisResult(bry_int_t barrier_deg_, const std::shared_ptr<MonomialFilter<DIM>>& filter_) : barrier_deg(barrier_deg_), filter(filter_) {}
 
-    /// @brief Degree definition of barrier
-    BRY_INL bool diagDeg() const {return m_diag_deg;}
+    BRY_INL bool isFilterApplied() const {return (bool)filter;}
 
-    SynthesisResult fromDiagonalDegree() const;
+    /// @brief Remove the current filter if one was supplied (otherwise do nothing)
+    void removeFilter();
 
     bry_int_t barrier_deg = 0;
 
-    private:
-        bool m_diag_deg = false;
+    std::shared_ptr<MonomialFilter<DIM>> filter = nullptr;
 };
 
 template <std::size_t DIM>

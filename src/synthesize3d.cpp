@@ -202,7 +202,9 @@ int main(int argc, char** argv) {
     prob->time_horizon = time_steps.get();
     prob->barrier_deg = barrier_deg.get();
     prob->degree_increase = deg_increase.get();
-    prob->diag_deg = diag_deg;
+    if (diag_deg) {
+        prob->filter = std::make_shared<DiagDegFilter<DIM>>(barrier_deg.get());
+    }
 
     if (subd.has()) {
         INFO("Subdividing in " << subd.get());
@@ -229,8 +231,8 @@ int main(int argc, char** argv) {
         //INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
         INFO("Computation time: " << result.comp_time << "s");
 
-        if (result.diagDeg())
-            result.fromDiagonalDegree();
+        if (result.isFilterApplied())
+            result.removeFilter();
 
         writeMatrixToFile(result.b_values, "certificate_coeffs.txt");
     }

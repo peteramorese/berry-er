@@ -50,7 +50,6 @@ int main(int argc, char** argv) {
     prob->time_horizon = 2;
     prob->barrier_deg = 3;
     prob->degree_increase = 0;
-    prob->diag_deg = false;
 
     prob->subdivide(10);
 
