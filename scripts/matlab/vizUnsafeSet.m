@@ -1,14 +1,15 @@
 function vizUnsafeSet(bounds)
     cap = 5.5;
     vertices = zeros(8, 3);
+    ceil_val = 1.0;
     vertices(1, :) = [bounds(1), bounds(3), 0];
     vertices(2, :) = [bounds(2), bounds(3), 0];
     vertices(3, :) = [bounds(2), bounds(4), 0];
     vertices(4, :) = [bounds(1), bounds(4), 0];
-    vertices(5, :) = [bounds(1), bounds(3), 1];
-    vertices(6, :) = [bounds(2), bounds(3), 1];
-    vertices(7, :) = [bounds(2), bounds(4), 1];
-    vertices(8, :) = [bounds(1), bounds(4), 1];
+    vertices(5, :) = [bounds(1), bounds(3), ceil_val];
+    vertices(6, :) = [bounds(2), bounds(3), ceil_val];
+    vertices(7, :) = [bounds(2), bounds(4), ceil_val];
+    vertices(8, :) = [bounds(1), bounds(4), ceil_val];
     vertices(9, :) = [bounds(1), bounds(3), cap];
     vertices(10, :) = [bounds(2), bounds(3), cap];
     vertices(11, :) = [bounds(2), bounds(4), cap];

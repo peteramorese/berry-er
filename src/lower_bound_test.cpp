@@ -2,98 +2,110 @@
 #include "berry/MultiIndex.h"
 #include "berry/Operations.h"
 #include "berry/BernsteinTransform.h"
-
 #include "ArgParser.h"
 #include "HyperRectangle.h"
 
-#include <iostream>
-#include <iomanip>
-
 #include <Eigen/Dense>
+
+#include <iomanip>
+#include <random>
 
 using namespace BRY;
 
 int main(int argc, char** argv) {
-	ArgParser parser(argc, argv);
-	auto deg_inc = parser.parse<bry_int_t>("deg-inc", 'i', 0l, "Degree increase");
 
     constexpr std::size_t DIM = 2;
-    bry_int_t deg = 4;
 
-    Eigen::Tensor<bry_float_t, DIM> tensor(deg + 1, deg + 1);
-    tensor.setValues({
-        {0.60631369908317678252, 13.38899485314757598076, 18.86898463745490772681, 6.24743038860395927259, 1.34529500295428050549},
-        {-2.42525479633270713009, 10.81045211233518443805, 4.97207263775089813862, -13.14568460745550737556, -5.01983046257055320893}, 
-        {5.51216124253491912555, -6.43344845860006842031, -36.64165664271996547541, -36.17435354323487217698, -10.50107490507991769846}, 
-        {13.15478702354328177648, 12.20662695965430089018, -1.69662035716220316317, -2.04142003212581357730, -0.54996795586680491397}, 
-        {2.28913616018212096037, 6.62611192786266656185, 9.88752619335051008420, 6.90385232680833382801, 1.80956659588261459248}});
-    tensor = tensor.shuffle(Eigen::array<int, 2>{1, 0});
-    //for (bry_int_t i = 0; i < deg; ++i) {
-    //    for (bry_int_t j = 0; j < deg; ++j) {
-    //        bry_float_t temp = tensor(i, j);
-    //        tensor(i, j) = tensor(j, i);
-    //        tensor(j, i) = temp;
-    //    }
-    //}
+	ArgParser parser(argc, argv);
+	auto barrier_deg = parser.parse<bry_int_t>("deg", 'd', 3l, "Barrier degree");
+	auto deg_increase = parser.parse<bry_int_t>("deg-inc", 'i', 0l, "Barrier degree increase");
+	auto subd = parser.parse<bry_int_t>("subd", 's', 0l, "Barrier subdivision");
+	auto trials = parser.parse<bry_int_t>("trials", 't', 1l, "Number of random trials");
+	auto seed = parser.parse<bry_int_t>("seed", "Seed the RNG");
+	auto fidelity = parser.parse<bry_int_t>("fidelity", 'f', 5000l, "Set the fidelity of the empirical LB");
+    parser.enableHelp();
 
-    Polynomial<DIM> p(tensor);
-    //DEBUG("p: " << p);
-    Eigen::Map<const Eigen::VectorXd> p_vec(p.tensor().data(), p.nMonomials());
-    DEBUG("p vec: " << p_vec.transpose());
+    std::random_device rd;
+    std::mt19937_64 gen(rd());
+    std::uniform_real_distribution<double> real_dist(-10.0, 10.0);
+    if (seed.has()) {
+        gen.seed(seed.get());
+    }
 
-    //p.coeff(0, 0) = -.1;
-    //p.coeff(1, 0) = -.7;
-    //p.coeff(2, 0) = 1.0;
-    //p.coeff(0, 1) = -0.4;
-    //p.coeff(1, 1) = 0.5;
-    //p.coeff(2, 1) = -0.1;
-    //p.coeff(0, 2) = 0.5;
-    //p.coeff(1, 2) = -0.2;
-    //p.coeff(2, 2) = 0.1;
+    for (bry_int_t t = 0; t < trials.get(); ++t) {
+        Eigen::Tensor<bry_float_t, DIM> tensor(barrier_deg.get() + 1, barrier_deg.get() + 1);
+        //tensor.setRandom();
+        for (std::size_t i = 0; i < tensor.size(); ++i) {
+            *(tensor.data() + i) = real_dist(gen);
+        }
 
+        BRY::Polynomial<DIM> p(std::move(tensor));
+        
+        bry_float_t emp_lb = 1.0e300;
+        bry_int_t n_emp = fidelity.get();
 
-    HyperRectangle<DIM> workspace;
-    Eigen::Vector<bry_float_t, DIM> boundary_width{0.2, 0.2};
-    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-1.0, -0.5) - boundary_width;
-    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.5, 0.5) + boundary_width;
+        //bry_float_t corner = 1.0 / (subd.get() + 1);
+        bry_float_t corner = 1.0;
 
-    //workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(0.0, 0.0);
-    //workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.9, 0.9);
-
-
-    //Matrix b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(deg);
-    Matrix p_to_b = BernsteinBasisTransform<DIM>::pwrToBernMatrix(deg, deg_inc.get());
-
-    //DEBUG("ws tf: " << workspace.transformationMatrix(deg));
-    Matrix ws_tf = workspace.transformationMatrix(deg);
-    Matrix t_mat = p_to_b * ws_tf;
-    //DEBUG("tmat: " << t_mat);
-    //auto p_bern_tf = transform(p, t_mat);
-    Eigen::VectorXd pb_vec_tf = t_mat * p_vec;
-    INFO("Lower bound: " << (pb_vec_tf.minCoeff()));
-
-    //DEBUG("tf rows: " << ws_tf.rows() << ", cols: " << ws_tf.cols());
-    //NEW_LINE;
-    //DEBUG("ws tf: \n" << ws_tf);
-    //NEW_LINE;
-    //DEBUG("p_vec: " << p_vec.transpose());
-    Eigen::VectorXd p_vec_tf = ws_tf * p_vec;
-    DEBUG("p_vec tfd: " << p_vec_tf.transpose());
-    Polynomial<DIM> p_just_tf(p_vec_tf);
-
-    auto printPCoeffs = [](const Polynomial<DIM>& p) {
-        for (std::size_t i = 0; i < p.tensor().size(); ++i) {
-            if (i < p.tensor().size() - 1) {
-                std::cout << std::fixed << std::setprecision(20) << p.tensor()(i) << ", ";
-            } else {
-                std::cout << std::fixed << std::setprecision(20) << p.tensor()(i) << std::endl;
+        for (bry_int_t i = 0; i <= n_emp; ++i) {
+            for (bry_int_t j = 0; j <= n_emp; ++j) {
+                bry_float_t x1 = 0.0 + i * (corner / n_emp);
+                bry_float_t x2 = 0.0 + j * (corner / n_emp);
+                bry_float_t val = p(x1, x2);
+                if (val < emp_lb) {
+                    emp_lb = val;
+                }
             }
         }
-    };
+        auto printSetBounds = [](const HyperRectangle<DIM>& set) {
+            DEBUG("Set bounds: [" 
+                << set.lower_bounds(0) << ", " 
+                << set.upper_bounds(0) << ", "
+                << set.lower_bounds(1) << ", " 
+                << set.upper_bounds(1) << "]");
+        };
 
-    DEBUG("p: ");
-    printPCoeffs(p);
-    DEBUG("p just tf: ");
-    printPCoeffs(p_just_tf);
-    return 0;
+        HyperRectangle<DIM> unit_set;
+        unit_set.lower_bounds = {0, 0};
+        unit_set.upper_bounds = corner * Eigen::Vector<bry_float_t, DIM>::Constant(1.0);
+
+        bry_float_t min_bern_lb = 1.0e300;
+        bry_float_t min_bern_ub = 1.0e300;
+        std::vector<HyperRectangle<DIM>> subd_sets = unit_set.subdivide(subd.get());
+        bool all_vertex = true;
+        for (auto set : subd_sets) {
+        //for (uint32_t i = 0; i < subd_sets.size(); ++i) {
+        //    const HyperRectangle<DIM>& set = subd_sets[i];
+
+            printSetBounds(set);
+            Matrix subd_tf = set.transformationMatrix(barrier_deg.get());
+            BRY::Polynomial<DIM> p_subd = transform<DIM, Basis::Power>(p, subd_tf);
+
+
+            Matrix tf = BernsteinBasisTransform<DIM>::pwrToBernMatrix(p_subd.degree(), deg_increase.get());
+            auto p_tf = transform<DIM, Basis::Power, Basis::Bernstein>(p_subd, tf);
+            auto[bern_lb, vertex_cond] = BernsteinBasisTransform<DIM>::infBound(p_tf);
+            if (!vertex_cond) {
+                all_vertex = false;
+            }
+            bry_float_t bern_gap = BernsteinBasisTransform<DIM>::infBoundGap(p_subd, vertex_cond, deg_increase.get());
+            if (bern_lb < min_bern_lb)
+                min_bern_lb = bern_lb;
+            if (bern_lb + bern_gap < min_bern_ub)
+                min_bern_ub = bern_lb + bern_gap;
+            DEBUG("Gap: [" << bern_lb << ", " << bern_lb + bern_gap << "]");
+        }
+
+        INFO("Empirical lower bound: " << emp_lb);
+        INFO("Bern lower bound: [" << min_bern_lb << ", " << min_bern_ub << "]  gap size: " << min_bern_ub - min_bern_lb);
+        //INFO("Bern lower bound: [" << bern_lb << ", " << bern_lb + bern_gap << "]  gap size: " << bern_gap);
+        if (all_vertex) {
+            INFO("Vertex condition holds");
+            continue;
+        }
+        if (min_bern_lb > (emp_lb + 0.00001) || (min_bern_ub - 0.00001) < emp_lb) {
+            ERROR("Bern gap does not hold!");
+            PAUSE;
+        }
+    }
 }

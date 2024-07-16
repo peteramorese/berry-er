@@ -160,28 +160,11 @@ int main(int argc, char** argv) {
     prob->time_horizon = time_steps.get();
     synthesizer.setProblem(prob);
 
-    synthesizer.initialize(deg_increase.get());
+    synthesizer.setConstraints(deg_increase.get());
     auto result = synthesizer.synthesize();
     
     INFO("Probability of safety: " << result.p_safe);
     INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
-
-    Matrix b_to_p = BernsteinBasisTransform<DIM>::bernToPwrMatrix(barrier_deg.get());
-    auto certificate_power = transform(*result.certificate, b_to_p);
-
-    INFO("Barrier: " << certificate_power);
-
-    if (cp_coeffs) {
-        NEW_LINE;
-        for (std::size_t i = 0; i < certificate_power.tensor().size(); ++i) {
-            if (i < certificate_power.tensor().size() - 1) {
-                std::cout << std::fixed << std::setprecision(20) << certificate_power.tensor()(i) << ", ";
-            } else {
-                std::cout << std::fixed << std::setprecision(20) << certificate_power.tensor()(i) << std::endl;
-            }
-        }
-        NEW_LINE;
-    }
 
     return 0;
 }
