@@ -12,14 +12,17 @@ namespace BRY {
 
 enum ConstraintType {
     Workspace = 0, 
-    Init, 
-    Unsafe,
-    Safe, 
+    Init = 1, 
+    Unsafe = 2,
+    Safe = 3, 
 };
 
 struct ConstraintID {
     ConstraintType type;
     bry_int_t set_idx;
+
+    // For use as a map key
+    BRY_INL bool operator<(const ConstraintID& other) const;
 };
 
 template <std::size_t DIM>
@@ -38,6 +41,12 @@ struct ConstraintMatrices {
 
     /// @brief Array with number elements equal to rows in `A` that identifies which set the constraint came from
     std::vector<ConstraintID> constraint_ids;
+
+    /// @brief Map from each constrained set to the transformation matrix. Each transformation does NOT include 
+    /// the Bernstein basis conversion, i.e., power basis barrier to power basis polynomial constraint to lower-bound.
+    /// Pointer will not own any object if the matrices were not stored upon construction (see 
+    /// `PolyDynamicsProblem::getConstraintMatrices()`)
+    std::unique_ptr<std::map<ConstraintID, Matrix>> transformation_matrices;
 
     /// @brief Degree definition of barrier
     BRY_INL bool diagDeg() const {return m_diag_deg;}
@@ -97,8 +106,9 @@ struct PolyDynamicsProblem {
         BRY_INL bry_int_t numSets() const;
 
         /// @brief Compute the constraint matrices
-        /// @return 
-        const ConstraintMatrices<DIM> getConstraintMatrices() const;
+        /// @param store_tf_matrices Returned object will cache the polynomial transformation matrices if true
+        /// @return Constraint matrices object
+        const ConstraintMatrices<DIM> getConstraintMatrices(bool store_tf_matrices = false) const;
 
         /// @brief Given a constraint ID, get the corresponding set that the constraint belongs to
         /// @param id ID of constraint
@@ -114,7 +124,7 @@ struct SynthesisResult : public LPSolver::Result {
     /// @brief Degree definition of barrier
     BRY_INL bool diagDeg() const {return m_diag_deg;}
 
-    void fromDiagonalDegree();
+    SynthesisResult fromDiagonalDegree() const;
 
     bry_int_t barrier_deg = 0;
 

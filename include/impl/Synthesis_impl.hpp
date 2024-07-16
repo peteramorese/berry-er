@@ -7,6 +7,15 @@
 #include <fstream>
 #include <iomanip>
 
+
+bool BRY::ConstraintID::operator<(const ConstraintID& other) const {
+    if (type == other.type) {
+        return set_idx < other.set_idx;
+    } else {
+        return type < other.type;
+    }
+}
+
 template <std::size_t DIM>
 BRY::ConstraintMatrices<DIM>::ConstraintMatrices(bry_int_t n_constraints, bry_int_t n_vars, bry_int_t barrier_deg_)
     : A(n_constraints, n_vars)
@@ -78,9 +87,11 @@ BRY::bry_int_t BRY::PolyDynamicsProblem<DIM>::numSets() const {
 }
 
 template <std::size_t DIM>
-const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices() const {
+const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices(bool store_tf_matrices) const {
 
     Matrix Phi_m = BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, degree_increase);
+
+    std::unique_ptr<std::map<ConstraintID, Matrix>> cached_constraint_matrices(store_tf_matrices ? new std::map<ConstraintID, Matrix>() : nullptr);
 
     bry_int_t n_cols = Phi_m.cols() + 2;
 
@@ -91,7 +102,14 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     Vector ws_lower_bound = Vector::Zero(ws_coeffs.rows());
     bry_int_t i = 0;
     for (const HyperRectangle<DIM>& set : workspace_sets) {
-        Matrix beta_coeffs = Phi_m * set.transformationMatrix(barrier_deg);
+        Matrix tf = set.transformationMatrix(barrier_deg);
+        Matrix beta_coeffs = Phi_m * tf;
+
+        if (store_tf_matrices) {
+            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Workspace, i}, std::move(tf)).second;
+            ASSERT(inserted, "Duplicate constraint ID found");
+        }
+
         Matrix coeffs(beta_coeffs.rows(), n_cols);
         coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
         ws_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
@@ -104,7 +122,14 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     Vector init_lower_bound = Vector::Zero(init_coeffs.rows());
     i = 0;
     for (const HyperRectangle<DIM>& set : init_sets) {
-        Matrix beta_coeffs = -Phi_m * set.transformationMatrix(barrier_deg);
+        Matrix tf = -set.transformationMatrix(barrier_deg);
+        Matrix beta_coeffs = Phi_m * tf;
+
+        if (store_tf_matrices) {
+            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Init, i}, std::move(tf)).second;
+            ASSERT(inserted, "Duplicate constraint ID found");
+        }
+
         Matrix coeffs(beta_coeffs.rows(), n_cols);
         coeffs << beta_coeffs, Vector::Ones(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
         init_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
@@ -117,7 +142,14 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     Vector unsafe_lower_bound = Vector::Ones(unsafe_coeffs.rows());
     i = 0;
     for (const HyperRectangle<DIM>& set : unsafe_sets) {
-        Matrix beta_coeffs = Phi_m * set.transformationMatrix(barrier_deg);
+        Matrix tf = set.transformationMatrix(barrier_deg);
+        Matrix beta_coeffs = Phi_m * tf;
+
+        if (store_tf_matrices) {
+            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Unsafe, i}, std::move(tf)).second;
+            ASSERT(inserted, "Duplicate constraint ID found");
+        }
+
         Matrix coeffs(beta_coeffs.rows(), n_cols);
         coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
         unsafe_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
@@ -141,9 +173,13 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     Matrix deg_lift_tf = makeDegreeChangeTransform<DIM>(barrier_deg, p);
 
     for (const HyperRectangle<DIM>& set : safe_sets) {
-        //DEBUG("Set transformation:\n" << set.transformationMatrix(p));
-        Matrix beta_coeffs = 
-            -Phi_p * set.transformationMatrix(p) * (F_expec_Gamma - deg_lift_tf);
+        Matrix tf = -set.transformationMatrix(p) * (F_expec_Gamma - deg_lift_tf);
+        Matrix beta_coeffs = Phi_p * tf;
+
+        if (store_tf_matrices) {
+            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Safe, i}, std::move(tf)).second;
+            ASSERT(inserted, "Duplicate constraint ID found");
+        }
         
         Matrix coeffs(beta_coeffs.rows(), n_cols);
         coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Ones(beta_coeffs.rows());
@@ -173,6 +209,8 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
         std::fill(it, std::next(it, Phi_p.rows()), ConstraintID{ConstraintType::Safe, set_i}); // Advance by Phi_p rows instead of Phi_m
         std::advance(it, Phi_p.rows());
     }
+
+    constraint_matrices.transformation_matrices = std::move(cached_constraint_matrices);
     
     if (diag_deg) {
         constraint_matrices.toDiagonalDegree();
@@ -212,7 +250,11 @@ std::list<BRY::HyperRectangle<DIM>>::iterator BRY::PolyDynamicsProblem<DIM>::loo
 }
 
 template <std::size_t DIM>
-void BRY::SynthesisResult<DIM>::fromDiagonalDegree() {
+BRY::SynthesisResult<DIM> BRY::SynthesisResult<DIM>::fromDiagonalDegree() const {
+    if (!m_diag_deg) {
+        WARN("Result is already in diagonal degree form");
+        return *this;
+    }
     bry_int_t n_coeffs = pow(barrier_deg + 1, DIM);
     ASSERT(b_values.size() != n_coeffs, "Supplied coefficient vector is already in square-degree form");
     Vector sq_coeffs = Vector::Zero(n_coeffs);
@@ -225,7 +267,10 @@ void BRY::SynthesisResult<DIM>::fromDiagonalDegree() {
         }
     }
 
-    b_values = sq_coeffs;
+    SynthesisResult new_result = *this;
+    new_result.b_values = sq_coeffs;
+    new_result.m_diag_deg = false;
+    return new_result;
 }
 
 template <std::size_t DIM>
@@ -248,20 +293,28 @@ BRY::SynthesisResult<DIM> BRY::synthesize(const ConstraintMatrices<DIM>& constra
 template <std::size_t DIM>
 BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(PolyDynamicsProblem<DIM> problem, bry_int_t max_iter, bry_int_t subdiv_per_iter, const std::string& solver_id) {
     ASSERT(subdiv_per_iter >= 1, "subdiv_per_iter must be geq than 1");
-    BRY::SynthesisResult<DIM> result(problem.diag_deg, problem.barrier_deg);
-    for (bry_int_t iter = 0; iter < max_iter; ++iter) {
+
+    bry_int_t iter = 0;
+    while (true) {
         LPSolver solver(solver_id);
-        ConstraintMatrices<DIM> constraints = problem.getConstraintMatrices();
+        ConstraintMatrices<DIM> constraints = problem.getConstraintMatrices(true);
         solver.setConstraintMatrices(constraints.A, constraints.b);
 
+        BRY::SynthesisResult<DIM> result(problem.diag_deg, problem.barrier_deg);
         static_cast<LPSolver::Result&>(result) = solver.solve(problem.time_horizon);
 
         NEW_LINE;
-        INFO("Iteration " << iter + 1 << " / " << max_iter << " p_safe = " << result.p_safe);
+        INFO("[Iteration " << iter + 1 << " / " << max_iter << "] p_safe = " << result.p_safe << " (time: " << result.comp_time <<")");
 
-        if (iter == max_iter - 1) {
-            break;
+        if (++iter == max_iter) {
+            return result;
         }
+
+        if (result.diagDeg()) {
+            result = result.fromDiagonalDegree();
+        }
+        Polynomial<DIM> barrier(result.b_values);
+
 
         // Compute the smallest max_subdiv_per_iter robustness values
         Vector soln_vec = solver.getSolnVector();
@@ -278,56 +331,39 @@ BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(PolyDynamicsProblem<DIM> probl
 
         // Determine the sets that have the lowest robustness values
         auto comp = [](const typename std::list<HyperRectangle<DIM>>::iterator& lhs, const typename std::list<HyperRectangle<DIM>>::iterator& rhs) -> bool {
-            return &(*lhs) < &(*rhs);
+            return &(*lhs) < &(*rhs); 
         };
-        std::set<typename std::list<HyperRectangle<DIM>>::iterator, decltype(comp)> ws_sets_to_subd(comp);
-        std::set<typename std::list<HyperRectangle<DIM>>::iterator, decltype(comp)> init_sets_to_subd(comp);
-        std::set<typename std::list<HyperRectangle<DIM>>::iterator, decltype(comp)> unsf_sets_to_subd(comp);
-        std::set<typename std::list<HyperRectangle<DIM>>::iterator, decltype(comp)> sf_sets_to_subd(comp);
-        bry_int_t num_sets_to_subd = 0;
+        std::set<typename std::list<HyperRectangle<DIM>>::iterator, decltype(comp)> unique_iterators(comp);
+
+        struct UniqueSetToSubd {
+            typename std::list<HyperRectangle<DIM>>::iterator it; // It pointing to the set to subd
+            ConstraintType type; // List to edit the element in
+            bry_float_t bound_gap; // Conservativeness of the bound in this set
+        };
+        std::vector<UniqueSetToSubd> bound_gap_sorted_iters;
+        bound_gap_sorted_iters.reserve(subdiv_per_iter);
+
         for (bry_int_t robustness_idx : robustness_indices) {
             const ConstraintID& id = constraints.constraint_ids[robustness_idx];
             auto it = problem.lookupSetFromConstraint(id);
-            bool inserted = false;
-            switch (id.type) {
-                case ConstraintType::Workspace:
-                    inserted = ws_sets_to_subd.insert(it).second;
-                    DEBUG("Subd ws set: " <<  id.set_idx);
-                    break;
-                case ConstraintType::Init: 
-                    inserted = init_sets_to_subd.insert(it).second;
-                    DEBUG("Subd init set: " <<  id.set_idx);
-                    break;
-                case ConstraintType::Unsafe:
-                    inserted = unsf_sets_to_subd.insert(it).second;
-                    DEBUG("Subd unsafe set: " <<  id.set_idx);
-                    break;
-                case ConstraintType::Safe:
-                    inserted = sf_sets_to_subd.insert(it).second;
-                    DEBUG("Subd safe set: " <<  id.set_idx);
-                    break;
-            }
-
+            bool inserted = unique_iterators.insert(it).second;
             if (inserted) {
-                ++num_sets_to_subd;
-                if (num_sets_to_subd >= subdiv_per_iter) {
+                Matrix tf = constraints.transformation_matrices->at(id);
+                Polynomial<DIM> constrained_barrier = transform(barrier, tf);
+                bry_float_t bound_gap = BernsteinBasisTransform<DIM>::infBoundGap(constrained_barrier, false, problem.degree_increase);
+                bound_gap_sorted_iters.push_back(UniqueSetToSubd{it, id.type, bound_gap});
+                if ((bound_gap_sorted_iters.size() >= subdiv_per_iter) && (std::abs(robustness_values[robustness_idx]) > BRY_FLOAT_DIFF_TOL)) {
                     break;
                 }
             }
         }
 
+        // Sort the iters by decreasing bound gap to subd the ones with largest gap first
+        std::sort(bound_gap_sorted_iters.begin(), bound_gap_sorted_iters.end(), 
+            [](const UniqueSetToSubd& lhs, const UniqueSetToSubd& rhs){return lhs.bound_gap > rhs.bound_gap;});
+
         // Subdivide the marked sets by removing the original set and adding the subdivided sets
         auto subdivideAndReplace = [](std::list<HyperRectangle<DIM>>& list_of_sets, std::list<HyperRectangle<DIM>>::iterator it_to_subd) {
-            //DEBUG("removing it: " << &*it_to_subd);
-            //bool found = false;
-            //for (auto it = list_of_sets.begin(); it != list_of_sets.end(); ++it) {
-            //    if (it == it_to_subd) {
-            //        found = true;
-            //        break;
-            //    }
-            //}
-            //ASSERT(found, "Iterator not found");
-
             // Subdivide in 2
             std::vector<HyperRectangle<DIM>> subdivisions = it_to_subd->subdivide(2);
             // Erase the original set
@@ -336,61 +372,22 @@ BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(PolyDynamicsProblem<DIM> probl
             list_of_sets.insert(following_it, subdivisions.begin(), subdivisions.end());
         };
 
-        if (iter >= 1) {
-            //for (uint32_t i = 0; i < robustness_indices.size(); ++i) {
-            //    ConstraintID id = constraints.constraint_ids[robustness_indices[i]];
-            //    DEBUG("Robustness val" << i << " " << robustness_values[robustness_indices[i]] << " set type: " << (uint32_t)id.type << " idx: " << id.set_idx);
-            //}
-
-            DEBUG("TESTING! ACTUALLY DIVIDING type: " << (uint32_t)ConstraintType::Safe << " set: 2");
-            auto it = problem.lookupSetFromConstraint(ConstraintID{ConstraintType::Safe, 2});
-            subdivideAndReplace(problem.safe_sets, it);
-
-            //DEBUG("TESTING! ACTUALLY DIVIDING Unsafe set 0");
-            //auto it = problem.lookupSetFromConstraint(ConstraintID{ConstraintType::Unsafe, 0});
-            //subdivideAndReplace(problem.unsafe_sets, it);
-
-            continue;
+        for (const UniqueSetToSubd& set_to_subd : bound_gap_sorted_iters) {
+            switch (set_to_subd.type) {
+                case ConstraintType::Workspace:
+                    subdivideAndReplace(problem.workspace_sets, set_to_subd.it);
+                    break;
+                case ConstraintType::Init:
+                    subdivideAndReplace(problem.init_sets, set_to_subd.it);
+                    break;
+                case ConstraintType::Unsafe:
+                    subdivideAndReplace(problem.unsafe_sets, set_to_subd.it);
+                    break;
+                case ConstraintType::Safe:
+                    subdivideAndReplace(problem.safe_sets, set_to_subd.it);
+            }
         }
-
-        for (auto it : ws_sets_to_subd) {
-            subdivideAndReplace(problem.workspace_sets, it);
-        }
-        for (auto it : init_sets_to_subd) {
-            subdivideAndReplace(problem.init_sets, it);
-        }
-        for (auto it : unsf_sets_to_subd) {
-            subdivideAndReplace(problem.unsafe_sets, it);
-        }
-        for (auto it : sf_sets_to_subd) {
-            subdivideAndReplace(problem.safe_sets, it);
-        }
-        //auto printSetBounds = [](const HyperRectangle<DIM>& set) {
-        //    DEBUG("Set bounds: [" 
-        //        << set.lower_bounds(0) << ", " 
-        //        << set.upper_bounds(0) << ", "
-        //        << set.lower_bounds(1) << ", " 
-        //        << set.upper_bounds(1) << "]");
-        //};
-
-        //DEBUG("Original list:");
-        //for (auto set : problem.unsafe_sets) {
-        //    printSetBounds(set);
-        //}
-        //NEW_LINE;
-        //auto test_it = ++problem.unsafe_sets.begin();
-        //DEBUG("Set to remove:");
-        //printSetBounds(*test_it);
-        //subdivideAndReplace(problem.unsafe_sets, test_it);
-        //NEW_LINE;
-
-        //DEBUG("Edited list:");
-        //for (auto set : problem.unsafe_sets) {
-        //    printSetBounds(set);
-        //}
-
     }
-    return result;
 }
 
 void BRY::writeMatrixToFile(const Matrix& matrix, const std::string& filename) {
