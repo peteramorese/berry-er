@@ -2,7 +2,8 @@
 #include "Noise.h"
 #include "HyperRectangle.h"
 #include "Synthesis.h"
-#include "ArgParser.h"
+
+#include "lemon/ArgParser.h"
 
 #include <iostream>
 #include <stdio.h>
@@ -13,19 +14,19 @@ using namespace BRY;
 
 int main(int argc, char** argv) {
 
-	ArgParser parser(argc, argv);
-    bool verbose = parser.parse<void>('v', "Verbose").has();
-    bool non_convex = parser.parse<void>("non-conv", "Solve the non-convex synthesis problem (default to convex)").has();
-    bool adaptive = parser.parse<void>('a', "Use the adaptive subdivision algorithm").has();
-    bool export_matrices = parser.parse<void>('e', "Export the matrices to use external solvers").has();
-    auto filter = parser.parse<std::string>("filter", 'f', "", "Select which filter to use; options: 'diagdeg', 'oddsum'");
-	auto solver_id = parser.parse<std::string>("s-id", 's', "SCIP", "Solver ID");
-	auto barrier_deg = parser.parse<bry_int_t>("deg", 'd', 4l, "Barrier degree");
-	auto deg_increase = parser.parse<bry_int_t>("deg-inc", 'i', 0l, "Barrier degree increase");
-	auto subd = parser.parse<bry_int_t>("subdiv", "Set subdivision");
-	auto ada_iters = parser.parse<bry_int_t>("ada-iters", 1l, "Number of adaptive subdivision iterations (ONLY FOR ADAPTIVE)");
-	auto ada_max_subdiv = parser.parse<bry_int_t>("ada-max-subdiv", 2l, "Max number of sets divided each iteration (ONLY FOR ADAPTIVE)");
-	auto time_steps = parser.parse<uint64_t>("ts", 't', 10, "Number of time steps");
+	lemon::ArgParser parser(argc, argv);
+    lemon::Arg<lemon::ArgT::Check> verbose = parser.addDef<lemon::ArgT::Check>().flag('v').key("Verbose");
+    lemon::Arg<lemon::ArgT::Check> non_convex = parser.addDef<lemon::ArgT::Check>().key("non-conv").description("Solve the non-convex synthesis problem (default to convex)");
+    lemon::Arg<lemon::ArgT::Check> adaptive = parser.addDef<lemon::ArgT::Check>().flag('a').description("Use the adaptive subdivision algorithm");
+    lemon::Arg<lemon::ArgT::Check> export_matrices = parser.addDef<lemon::ArgT::Check>().flag('e').description("Export the matrices to use external solvers");
+    lemon::Arg<lemon::ArgT::Value, std::string> filter = parser.addDef<lemon::ArgT::Value, std::string>().flag('f').key("filter").description("Select which filter to use").options({"diagdeg", "oddsum"});
+    lemon::Arg<lemon::ArgT::Value, std::string> solver_id = parser.addDef<lemon::ArgT::Value, std::string>().flag('s').key("s-id").description("Solver ID").defaultValue("SCIP");
+    lemon::Arg<lemon::ArgT::Value, bry_int_t> barrier_deg = parser.addDef<lemon::ArgT::Value, bry_int_t>().flag('d').key("deg").description("Barrier degree").required();
+	lemon::Arg<lemon::ArgT::Value, bry_int_t> deg_increase = parser.addDef<lemon::ArgT::Value, bry_int_t>().flag('i').key("deg-inc").defaultValue(0l).description("Barrier degree increase");
+	lemon::Arg<lemon::ArgT::Value, bry_int_t> subd = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("subd").flag('s').defaultValue(0l).description("Barrier subdivision");
+	lemon::Arg<lemon::ArgT::Value, bry_int_t> ada_iters = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ada-iters").defaultValue(1l).description("Number of adaptive subdivision iterations (ONLY FOR ADAPTIVE)");
+	lemon::Arg<lemon::ArgT::Value, bry_int_t> ada_max_subdiv = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ada-max-subdiv").defaultValue(2l).description("Max number of sets divided each iteration (ONLY FOR ADAPTIVE)");
+	lemon::Arg<lemon::ArgT::Value, bry_int_t> time_steps = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ts").flag('t').defaultValue(10l).description("Number of time steps");
     parser.enableHelp();
 
     constexpr std::size_t DIM = 2;
@@ -187,18 +188,20 @@ int main(int argc, char** argv) {
         }
     }
 
-    prob->time_horizon = time_steps.get();
-    prob->barrier_deg = barrier_deg.get();
-    prob->degree_increase = deg_increase.get();
-    if (filter.get() == "diagdeg") {
-        prob->filter = std::make_shared<DiagDegFilter<DIM>>(barrier_deg.get());
-    } else if (filter.get() == "oddsum") {
-        prob->filter = std::make_shared<OddSumFilter<DIM>>();
+    prob->time_horizon = time_steps.value();
+    prob->barrier_deg = barrier_deg.value();
+    prob->degree_increase = deg_increase.value();
+    if (filter) {
+        if (filter.value() == "diagdeg") {
+            prob->filter = std::make_shared<DiagDegFilter<DIM>>(barrier_deg.value());
+        } else if (filter.value() == "oddsum") {
+            prob->filter = std::make_shared<OddSumFilter<DIM>>();
+        }
     }
 
-    if (subd.has()) {
-        INFO("Subdividing in " << subd.get());
-        prob->subdivide(subd.get());
+    if (subd) {
+        INFO("Subdividing in " << subd.value());
+        prob->subdivide(subd.value());
     }
 
     //Matrix F_expec_Gamma = prob->dynamics->dynamicsPowerMatrix(prob->barrier_deg) * prob->noise->additiveNoiseMatrix(prob->barrier_deg);
@@ -246,9 +249,9 @@ int main(int argc, char** argv) {
     INFO("Solving...");
     SynthesisResult<DIM> result;
     if (adaptive) {
-        result = synthesizeAdaptive(*prob, ada_iters.get(), ada_max_subdiv.get(), solver_id.get());
+        result = synthesizeAdaptive(*prob, ada_iters.value(), ada_max_subdiv.value(), solver_id.value());
     } else {
-        result = synthesize(*prob, solver_id.get());
+        result = synthesize(*prob, solver_id.value());
     }
     INFO("Done!");
     NEW_LINE;
