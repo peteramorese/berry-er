@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     bool non_convex = parser.parse<void>("non-conv", "Solve the non-convex synthesis problem (default to convex)").has();
     bool adaptive = parser.parse<void>('a', "Use the adaptive subdivision algorithm").has();
     bool export_matrices = parser.parse<void>('e', "Export the matrices to use external solvers").has();
-    bool diag_deg = parser.parse<void>("diag-deg", "Use the diagonal polynomial degree definition").has();
+    auto filter = parser.parse<std::string>("filter", 'f', "", "Select which filter to use; options: 'diagdeg', 'oddsum'");
 	auto solver_id = parser.parse<std::string>("s-id", 's', "SCIP", "Solver ID");
 	auto barrier_deg = parser.parse<bry_int_t>("deg", 'd', 4l, "Barrier degree");
 	auto deg_increase = parser.parse<bry_int_t>("deg-inc", 'i', 0l, "Barrier degree increase");
@@ -190,8 +190,10 @@ int main(int argc, char** argv) {
     prob->time_horizon = time_steps.get();
     prob->barrier_deg = barrier_deg.get();
     prob->degree_increase = deg_increase.get();
-    if (diag_deg) {
+    if (filter.get() == "diagdeg") {
         prob->filter = std::make_shared<DiagDegFilter<DIM>>(barrier_deg.get());
+    } else if (filter.get() == "oddsum") {
+        prob->filter = std::make_shared<OddSumFilter<DIM>>();
     }
 
     if (subd.has()) {
