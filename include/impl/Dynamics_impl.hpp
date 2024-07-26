@@ -4,6 +4,10 @@
 
 #include "berry/MultiIndex.h"
 
+#include "lemon/Random.h"
+
+#include <iomanip>
+
 template <std::size_t DIM>
 template <typename ... DEGS>
 BRY::PolynomialDynamics<DIM>::PolynomialDynamics(DEGS ... degrees) 
@@ -12,6 +16,14 @@ BRY::PolynomialDynamics<DIM>::PolynomialDynamics(DEGS ... degrees)
     ExponentVec<DIM> degree_vec = makeExponentVec(degrees...);
     m_f.reserve(DIM);
     for (bry_int_t deg : degree_vec)
+        m_f.emplace_back(deg);
+}
+
+template <std::size_t DIM>
+BRY::PolynomialDynamics<DIM>::PolynomialDynamics(std::array<bry_int_t, DIM> degrees)
+{
+    m_f.reserve(DIM);
+    for (bry_int_t deg : degrees)
         m_f.emplace_back(deg);
 }
 
@@ -45,6 +57,28 @@ BRY::bry_int_t BRY::PolynomialDynamics<DIM>::summedDegree() const {
 template <std::size_t DIM>
 BRY::bry_int_t BRY::PolynomialDynamics<DIM>::composedDegree(bry_int_t m) const {
     return m * summedDegree();
+}
+
+template <std::size_t DIM>
+void BRY::PolynomialDynamics<DIM>::setRandom() {
+    for (bry_int_t i = 0; i < DIM; ++i) {
+        std::array<bry_int_t, DIM> idx;
+        MultiIndex<ExhaustiveIncrementer> midx(idx.data(), DIM, true, m_f[i].degree() + 1);
+        for (; !midx.last(); ++midx) {
+            bool diag_lin = true;
+            for (bry_int_t j = 0; j < DIM; ++j) {
+                if ((j == i && midx[j] != 1) || (j != i && midx[j] != 0)) {
+                    diag_lin = false;
+                    break;
+                } 
+            }
+            if (diag_lin) {
+                m_f[i].coeff(idx) = lemon::RNG::srandd(0.9, 1.1);
+            } else {
+                m_f[i].coeff(idx) = lemon::RNG::srandd(-0.1, 0.1);
+            }
+        }
+    }
 }
 
 template <std::size_t DIM>
@@ -89,4 +123,20 @@ BRY::Matrix BRY::PolynomialDynamics<DIM>::dynamicsPowerMatrix(bry_int_t m) const
     }
 
     return F;
+}
+
+template <std::size_t DIM>
+std::ostream& operator<<(std::ostream& os, const BRY::PolynomialDynamics<DIM>& dynamics) {
+    BRY::bry_int_t max_header_sz = 0;
+    std::array<std::string, DIM> headers;
+    for (BRY::bry_int_t i = 0; i < DIM; ++i) {
+        headers[i] = "x" + std::to_string(i) + "'";
+        if (headers[i].size() > max_header_sz) {
+            max_header_sz = headers[i].size();
+        }
+    }
+    for (BRY::bry_int_t i = 0; i < DIM; ++i) {
+        os << std::setw(max_header_sz) << LMN_LOG_BWHITE(headers[i]) << " = " << dynamics[i] << "\n";
+    }
+    return os;
 }
