@@ -84,8 +84,8 @@ void BRY::PolynomialDynamics<DIM>::setRandom() {
 template <std::size_t DIM>
 BRY::Matrix BRY::PolynomialDynamics<DIM>::dynamicsPowerMatrix(bry_int_t m) const {
     BRY::bry_int_t p = composedDegree(m);
-    BRY::bry_int_t m_monoms = pow(m + 1, DIM);
-    BRY::bry_int_t p_monoms = pow(p + 1, DIM);
+    BRY::bry_int_t m_monoms = BRY::pow(m + 1, DIM);
+    BRY::bry_int_t p_monoms = BRY::pow(p + 1, DIM);
 
     Matrix F(p_monoms, m_monoms);
     F.col(0) = Vector::Zero(p_monoms);
