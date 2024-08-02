@@ -2,6 +2,7 @@
 #include "Noise.h"
 #include "HyperRectangle.h"
 #include "Synthesis.h"
+#include "AdaptiveProblem.h"
 #include "Tools.h"
 
 #include "lemon/ArgParser.h"
