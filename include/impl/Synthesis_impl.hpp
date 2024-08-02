@@ -47,19 +47,27 @@ void BRY::ConstraintMatrices<DIM>::applyFilter() {
 
     bry_int_t n_coeffs = pow(barrier_deg + 1, DIM);
 
-    auto removeCol = [](Eigen::MatrixXd& m, int col) {
-        Eigen::MatrixXd new_m(m.rows(), m.cols() - 1);
-        new_m << m.leftCols(col), m.rightCols(m.cols() - col - 1);
-        m = new_m;
-    };
+    bry_int_t removed_cols = 0;
 
-    bry_int_t cols_removed = 0;
+    std::vector<bry_int_t> filter_flags(A.cols(), false);
 
     for (auto col_midx = mIdxW(DIM, barrier_deg + 1); !col_midx.last(); ++col_midx) {
         if (filter->remove(col_midx.begin())) {
-            removeCol(A, col_midx.inc().wrappedIdx() - cols_removed++);
+            filter_flags[col_midx.inc().wrappedIdx()] = true;
+            ++removed_cols;
+        } 
+    }
+
+    Eigen::MatrixXd filtered_A(A.rows(), A.cols() - removed_cols);
+    bry_int_t new_idx = 0;
+    for (bry_int_t old_idx = 0; old_idx < A.cols(); ++old_idx) {
+        if (!filter_flags[old_idx]) {
+            filtered_A.col(new_idx++) = A.col(old_idx);
         }
     }
+
+    A = filtered_A;
+
     m_filter_applied = true;
 }
 
@@ -100,6 +108,7 @@ BRY::bry_int_t BRY::PolyDynamicsProblem<DIM>::numSets() const {
 
 template <std::size_t DIM>
 const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices(bool store_tf_matrices) const {
+    INFO("Creating constraint matrices");
 
     Matrix Phi_m = BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, degree_increase);
 
@@ -126,6 +135,7 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
         coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
         ws_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
     }
+    INFO("Workspace constraints done. Computing initial set constraints...");
 
     // Initial sets
     if (init_sets.empty())
@@ -146,6 +156,7 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
         coeffs << beta_coeffs, Vector::Ones(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
         init_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
     }
+    INFO("Initial sets done. Computing unsafe set constraints...");
 
     // Unsafe sets
     if (unsafe_sets.empty())
@@ -166,15 +177,20 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
         coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
         unsafe_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
     }
+    INFO("Unsafe sets done. Computing safe set constraints...");
 
     // Safe sets
     if (safe_sets.empty())
         WARN("No safe sets were provided");
     //DEBUG("Dynamics power matrix: \n" << dynamics->dynamicsPowerMatrix(barrier_deg));
     //DEBUG("Noise matrix: \n" << noise->additiveNoiseMatrix(barrier_deg));
+    DEBUG("b4 f expec gamma compute");
     Matrix F_expec_Gamma = dynamics->dynamicsPowerMatrix(barrier_deg) * noise->additiveNoiseMatrix(barrier_deg);
+    DEBUG("af f expec gamma compute");
     bry_int_t p = dynamics->composedDegree(barrier_deg);
+    DEBUG("b4 phi p");
     Matrix Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(p, degree_increase);
+    DEBUG("af phi p (size: " << Phi_p.size());
     Vector gamma_coeffs = Vector::Ones(Phi_p.cols());
     ASSERT(F_expec_Gamma.rows() == Phi_p.cols(), "Dimension mismatch between F and Phi (p)");
 
@@ -185,7 +201,9 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     Matrix deg_lift_tf = makeDegreeChangeTransform<DIM>(barrier_deg, p);
 
     for (const HyperRectangle<DIM>& set : safe_sets) {
+        DEBUG("b4 tf");
         Matrix tf = -set.transformationMatrix(p) * (F_expec_Gamma - deg_lift_tf);
+        DEBUG("af tf");
         Matrix beta_coeffs = Phi_p * tf;
 
         if (store_tf_matrices) {
@@ -197,6 +215,7 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
         coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Ones(beta_coeffs.rows());
         safe_coeffs.block(Phi_p.rows() * i++, 0, Phi_p.rows(), n_cols) = coeffs;
     }
+    INFO("Safe sets done.");
 
     BRY::ConstraintMatrices<DIM> constraint_matrices(ws_coeffs.rows() + init_coeffs.rows() + unsafe_coeffs.rows() + safe_coeffs.rows(), n_cols, barrier_deg);
 
@@ -225,8 +244,11 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     constraint_matrices.transformation_matrices = std::move(cached_constraint_matrices);
     constraint_matrices.filter = filter;
     if (filter) {
+        INFO("Applying filter...");
         constraint_matrices.applyFilter();
+        INFO("Done!");
     }
+    INFO("Created constraint matrices");
     return constraint_matrices;
 }
 

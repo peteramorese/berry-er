@@ -8,7 +8,7 @@ function z = polyval2(coeffs, x, y, cap)
             end
         end
     end
-    z = min(z, cap);
+    % z = min(z, cap);
     fprintf("Min grid value: %.5f\n", min(z,[],"all"));
 end
 

@@ -10,8 +10,8 @@ function visPolynomial2(coeffs, ws_bounds)
     
     % Plot the 2D polynomial
     surf(x, y, z, 'EdgeColor', 'none');
-    xlabel('x_1');
-    ylabel('x_2');
+    xlabel('x_0');
+    ylabel('x_1');
     zlabel('B(x)');
     % title('Visualization of 2D Polynomial');
     colormap("parula"); 

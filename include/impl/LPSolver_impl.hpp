@@ -87,7 +87,12 @@ BRY::LPSolver::Result BRY::LPSolver::solve(uint32_t time_horizon) {
         beta_values(i) = m_b[i]->solution_value();
     }
 
-    return Result{m_result_status, 1.0 - m_objective->Value(), m_eta->solution_value(), m_gamma->solution_value(), std::move(beta_values), t.now(TimeUnit::s)};
+    bry_float_t p_safe = 0.0;
+    if (m_result_status == ort::MPSolver::ResultStatus::OPTIMAL) {
+        p_safe = 1.0 - m_objective->Value();
+    }
+
+    return Result{m_result_status, p_safe, m_eta->solution_value(), m_gamma->solution_value(), std::move(beta_values), t.now(TimeUnit::s)};
 }
 
 BRY::Vector BRY::LPSolver::getSolnVector() const {

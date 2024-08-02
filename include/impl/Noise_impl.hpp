@@ -60,9 +60,15 @@ BRY::Matrix BRY::AdditiveGaussianNoise<DIM>::additiveNoiseMatrix(bry_int_t m) co
 }
 
 template <std::size_t DIM>
-Eigen::Tensor<BRY::bry_float_t, DIM> BRY::AdditiveGaussianNoise<DIM>::momentTensor(bry_int_t m) const {
-    MomentGenerator gen(this, m);
-    return gen.getTensor();
+const Eigen::Tensor<BRY::bry_float_t, DIM>& BRY::AdditiveGaussianNoise<DIM>::momentTensor(bry_int_t m) const {
+    if (!!m_moment_tensor && m == m_moment_tensor_deg) {
+        return *m_moment_tensor;
+    } else {
+        MomentGenerator gen(this, m);
+        m_moment_tensor = std::make_unique<Eigen::Tensor<bry_float_t, DIM>>(gen.getTensor());
+        m_moment_tensor_deg = m;
+        return *m_moment_tensor;
+    }
 }
 
 template <std::size_t DIM>
@@ -141,10 +147,9 @@ BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::MomentGenerator(const Additive
     *m_tensor.data() = 1.0;
     ParDerivIncr init_incr_obj(&m_tensor, &p_exp, &exp_polynomial_first_derivatives, init_polynomial);
 
-    INFO("Calculating moment matrix...");
     minPathIncr<ParDerivIncr, DIM>(&init_incr_obj, makeUniformArray<bry_int_t, DIM>(0), span_dims);
+    INFO_SMLN("Calculating moment matrix: " << m_counter << " / " << m_tensor.size() << " Done!");
     NEW_LINE;
-    INFO("Done!");
 }
 
 template <std::size_t DIM>
@@ -259,7 +264,7 @@ bool BRY::AdditiveGaussianNoise<DIM>::MomentGenerator::hasNotBeenSeen(const std:
         return false;
     } else {
         ++m_counter;
-        INFO_SMLN(" " << m_counter << " / " << m_tensor.size());
+        INFO_SMLN("Calculating moment matrix: " << m_counter << " / " << m_tensor.size());
         m_duplicate[flat_idx] = true;
         return true;
     }

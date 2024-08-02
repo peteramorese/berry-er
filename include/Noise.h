@@ -18,7 +18,7 @@ class AdditiveGaussianNoise {
 
         Matrix additiveNoiseMatrix(bry_int_t m) const;
 
-        Eigen::Tensor<bry_float_t, DIM> momentTensor(bry_int_t m) const;
+        const Eigen::Tensor<bry_float_t, DIM>& momentTensor(bry_int_t m) const;
 
     private:
         class MomentGenerator {
@@ -44,6 +44,8 @@ class AdditiveGaussianNoise {
     private:
         Eigen::Vector<bry_float_t, DIM> m_mean;
         Covariance<DIM> m_cov;
+        mutable std::unique_ptr<Eigen::Tensor<bry_float_t, DIM>> m_moment_tensor;
+        mutable bry_int_t m_moment_tensor_deg;
 
 };
 
