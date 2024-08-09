@@ -79,20 +79,45 @@ struct ConstraintMatrices {
         bool m_filter_applied;
 };
 
+/// @brief Hyperrectangle that stores the degree of the bernstein conversion
+/// @tparam DIM 
 template <std::size_t DIM>
-struct PolyDynamicsProblem {
+struct DegHyperRectangle : public HyperRectangle<DIM> {
+    /// @brief Degree of the bernstein conversion
+    bry_int_t bernstein_degree_increase = 0;
+};
+
+/// @brief Struct containing all of the set bounding information for a synthesis problem
+template <std::size_t DIM>
+struct SetDefinitions {
+    /* Set definitions */
+    std::list<DegHyperRectangle<DIM>> workspace_sets = {HyperRectangle<DIM>()};
+    std::list<DegHyperRectangle<DIM>> init_sets;
+    std::list<DegHyperRectangle<DIM>> unsafe_sets;
+    std::list<DegHyperRectangle<DIM>> safe_sets;
+
+    public:
+        /// @brief Helper for setting the workspace from a single set
+        /// @param workspace Hyper-rectangle workspace
+        void setWorkspace(const HyperRectangle<DIM>& workspace);
+
+        /// @brief Subdivide the problem for less conservativeness
+        /// @param subdivision Integer number of subdivisions along one dimension
+        void subdivide(uint32_t subdivision);
+
+        /// @brief Get the total number of sets across workspace, init, unsafe, and safe.
+        /// @return 
+        BRY_INL bry_int_t numSets() const;
+};
+
+template <std::size_t DIM>
+struct PolyDynamicsProblem : public SetDefinitions<DIM> {
 
     /// @brief Dynamics
     std::shared_ptr<PolynomialDynamics<DIM>> dynamics;
 
     /// @brief Noise
     std::shared_ptr<AdditiveGaussianNoise<DIM>> noise;
-
-    /* Set definitions */
-    std::list<HyperRectangle<DIM>> workspace_sets = {HyperRectangle<DIM>()};
-    std::list<HyperRectangle<DIM>> init_sets;
-    std::list<HyperRectangle<DIM>> unsafe_sets;
-    std::list<HyperRectangle<DIM>> safe_sets;
 
     /// @brief Number of time steps to verify the system for
     uint32_t time_horizon = 10;
@@ -107,18 +132,6 @@ struct PolyDynamicsProblem {
     std::shared_ptr<MonomialFilter<DIM>> filter = nullptr;
 
     public:
-        /// @brief Helper for setting the workspace from a single set
-        /// @param workspace Hyper-rectangle workspace
-        void setWorkspace(const HyperRectangle<DIM>& workspace);
-
-        /// @brief Subdivide the problem for less conservativeness
-        /// @param subdivision Integer number of subdivisions along one dimension
-        void subdivide(uint32_t subdivision);
-
-        /// @brief Get the total number of sets across workspace, init, unsafe, and safe.
-        /// @return 
-        BRY_INL bry_int_t numSets() const;
-
         /// @brief Compute the constraint matrices
         /// @param store_tf_matrices Returned object will cache the polynomial transformation matrices if true
         /// @return Constraint matrices object

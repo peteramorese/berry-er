@@ -2,7 +2,7 @@
 #include "Noise.h"
 #include "HyperRectangle.h"
 #include "Synthesis.h"
-#include "AdaptiveProblem.h"
+//#include "AdaptiveProblem.h"
 #include "Tools.h"
 
 #include "lemon/ArgParser.h"
@@ -14,7 +14,7 @@
 
 using namespace BRY;
 
-constexpr std::size_t DIM = 3;
+constexpr std::size_t DIM = 2;
 
 int main(int argc, char** argv) {
 
@@ -100,12 +100,12 @@ int main(int argc, char** argv) {
 
     // Init set
     // Set all higher dimensions to btw -0.1 and 0.1
-    HyperRectangle<DIM> init_set(-0.05, 0.05);
+    HyperRectangle<DIM> init_set(-0.01, 0.01);
     // Edit the specific values for the 2D plane we're working in
-    //init_set.lower_bounds(0) = -0.8;
-    //init_set.upper_bounds(0) = -0.6;
-    //init_set.lower_bounds(1) = 0.0;
-    //init_set.upper_bounds(1) = 0.2;
+    init_set.lower_bounds(0) = -0.8;
+    init_set.upper_bounds(0) = -0.6;
+    init_set.lower_bounds(1) = 0.0;
+    init_set.upper_bounds(1) = 0.2;
     prob->init_sets.push_back(init_set);
     if (verbose) {
         INFO("Initial set:");
@@ -116,20 +116,28 @@ int main(int argc, char** argv) {
     prob->unsafe_sets.insert(prob->unsafe_sets.end(), boundary_sets.begin(), boundary_sets.end());
 
     if (non_convex) {
-        // Non convex unsafe regions
+        // BLOCKING OBSTACLE
         HyperRectangle<DIM> upper_region(-1.0, 1.0);
         upper_region.lower_bounds(0) = -0.57;
-        upper_region.upper_bounds(0) = -0.53;
+        upper_region.upper_bounds(0) = -0.01;
         upper_region.lower_bounds(1) = -0.17;
-        upper_region.upper_bounds(1) = -0.13;
+        upper_region.upper_bounds(1) = 0.01;
         prob->unsafe_sets.push_back(upper_region);
+
+        // Non convex unsafe regions
+        //HyperRectangle<DIM> upper_region(-1.0, 1.0);
+        //upper_region.lower_bounds(0) = -0.57;
+        //upper_region.upper_bounds(0) = -0.53;
+        //upper_region.lower_bounds(1) = -0.17;
+        //upper_region.upper_bounds(1) = -0.13;
+        //prob->unsafe_sets.push_back(upper_region);
         //printSetBounds(upper_region);
-        HyperRectangle<DIM> lower_region(-1.0, 1.0);
-        lower_region.lower_bounds(0) = -0.57;
-        lower_region.upper_bounds(0) = -0.53;
-        lower_region.lower_bounds(1) = 0.28;
-        lower_region.upper_bounds(1) = 0.32;
-        prob->unsafe_sets.push_back(lower_region);
+        //HyperRectangle<DIM> lower_region(-1.0, 1.0);
+        //lower_region.lower_bounds(0) = -0.57;
+        //lower_region.upper_bounds(0) = -0.53;
+        //lower_region.lower_bounds(1) = 0.28;
+        //lower_region.upper_bounds(1) = 0.32;
+        //prob->unsafe_sets.push_back(lower_region);
         //printSetBounds(lower_region);
     }
     if (verbose) {

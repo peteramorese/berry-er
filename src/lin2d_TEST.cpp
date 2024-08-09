@@ -36,13 +36,13 @@ int main(int argc, char** argv) {
     prob->dynamics.reset(new PolynomialDynamics<DIM>(1, 1));
     PolynomialDynamics<DIM>& dynamics = *prob->dynamics;
     dynamics[0].coeff(0, 0) = 0.0;
-    dynamics[0].coeff(1, 0) = 0.5;
-    dynamics[0].coeff(0, 1) = 0.0;
-    dynamics[0].coeff(1, 1) = 0.0;
+    dynamics[0].coeff(1, 0) = 0.7788;
+    dynamics[0].coeff(0, 1) = 0.6353;
+    //dynamics[0].coeff(1, 1) = 0.0;
     dynamics[1].coeff(0, 0) = 0.0;
     dynamics[1].coeff(1, 0) = 0.0;
-    dynamics[1].coeff(0, 1) = 0.5;
-    dynamics[1].coeff(1, 1) = 0.0;
+    dynamics[1].coeff(0, 1) = 0.6376;
+    //dynamics[1].coeff(1, 1) = 0.0;
 
     Covariance<DIM> cov;
     cov(0, 0) = 0.01;
@@ -62,9 +62,7 @@ int main(int argc, char** argv) {
     };
 
 
-    HyperRectangle<DIM> workspace;
-    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-1.0, -0.5) - boundary_width;
-    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.5, 0.5) + boundary_width;
+    HyperRectangle<DIM> workspace(-5.0, 5.0);
     prob->setWorkspace(workspace);
     //DEBUG("Workspace set:");
     //printSetBounds(workspace);
@@ -73,45 +71,17 @@ int main(int argc, char** argv) {
     HyperRectangle<DIM> init_set;
     init_set.lower_bounds(0) = -0.8;
     init_set.upper_bounds(0) = -0.6;
-    init_set.lower_bounds(1) = -0.2;
-    init_set.upper_bounds(1) = 0.0;
+    init_set.lower_bounds(1) = 0.0;
+    init_set.upper_bounds(1) = 0.2;
     prob->init_sets.push_back(init_set);
     //DEBUG("Init set:");
     //printSetBounds(init_set);
     
     //DEBUG("Unsafe sets:");
-    // Unsafe set
-    HyperRectangle<DIM> boundary_left;
-    // Boundary left
-    boundary_left.lower_bounds(0) = -1.0 - boundary_width(0);
-    boundary_left.upper_bounds(0) = -1.0;
-    boundary_left.lower_bounds(1) = -0.5 - boundary_width(1);
-    boundary_left.upper_bounds(1) = 0.5 + boundary_width(1);
-    prob->unsafe_sets.push_back(boundary_left);
-    //printSetBounds(boundary_left);
-    // Boundary right
-    HyperRectangle<DIM> boundary_right;
-    boundary_right.lower_bounds(0) = 0.5;
-    boundary_right.upper_bounds(0) = 0.5 + boundary_width(0);
-    boundary_right.lower_bounds(1) = -0.5 - boundary_width(1);
-    boundary_right.upper_bounds(1) = 0.5 + boundary_width(1);
-    prob->unsafe_sets.push_back(boundary_right);
-    //printSetBounds(boundary_right);
-    // Boundary top
-    HyperRectangle<DIM> boundary_top;
-    boundary_top.lower_bounds(0) = -1.0;
-    boundary_top.upper_bounds(0) = 0.5;
-    boundary_top.lower_bounds(1) = 0.5;
-    boundary_top.upper_bounds(1) = 0.5 + boundary_width(1);
-    prob->unsafe_sets.push_back(boundary_top);
-    //printSetBounds(boundary_top);
-    // Boundary bottom
-    HyperRectangle<DIM> boundary_bottom;
-    boundary_bottom.lower_bounds(0) = -1.0;
-    boundary_bottom.upper_bounds(0) = 0.5;
-    boundary_bottom.lower_bounds(1) = -0.5 - boundary_width(1);
-    boundary_bottom.upper_bounds(1) = -0.5;
-    prob->unsafe_sets.push_back(boundary_bottom);
+    std::list<HyperRectangle<DIM>> boundary_sets = makeRectBoundary(workspace, 0.2);
+    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-1.0, -0.5) - boundary_width;
+    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.5, 0.5) + boundary_width;
+    prob->unsafe_sets = boundary_sets;
     //printSetBounds(boundary_bottom);
     if (non_convex) {
         // Non convex unsafe regions

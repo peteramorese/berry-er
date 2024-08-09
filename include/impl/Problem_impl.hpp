@@ -77,21 +77,21 @@ BRY::Vector BRY::ConstraintMatrices<DIM>::computeRobustnessVec(const Vector& sol
 }
 
 template <std::size_t DIM>
-void BRY::PolyDynamicsProblem<DIM>::setWorkspace(const HyperRectangle<DIM>& workspace) {
+void BRY::SetDefinitions<DIM>::setWorkspace(const HyperRectangle<DIM>& workspace) {
     workspace_sets = {workspace};
 }
 
 template <std::size_t DIM>
-void BRY::PolyDynamicsProblem<DIM>::subdivide(uint32_t subdivision) {
+void BRY::SetDefinitions<DIM>::subdivide(uint32_t subdivision) {
     if (subdivision < 2) {
         WARN("Subdivision is less than 2 (no effect)");
         return;
     }
-    auto divide = [&] (std::list<HyperRectangle<DIM>>& subd_sets) {
-        const std::list<HyperRectangle<DIM>> original_sets = subd_sets;
+    auto divide = [&] (std::list<DegHyperRectangle<DIM>>& subd_sets) {
+        const std::list<DegHyperRectangle<DIM>> original_sets = subd_sets;
         subd_sets.clear();
         for (const auto& set : original_sets) {
-            std::vector<HyperRectangle<DIM>> subd_sets_to_insert = set.subdivide(subdivision);
+            std::vector<DegHyperRectangle<DIM>> subd_sets_to_insert = set.subdivide(subdivision);
             subd_sets.insert(subd_sets.end(), subd_sets_to_insert.begin(), subd_sets_to_insert.end());
         }
     };
@@ -102,7 +102,7 @@ void BRY::PolyDynamicsProblem<DIM>::subdivide(uint32_t subdivision) {
 }
 
 template <std::size_t DIM>
-BRY::bry_int_t BRY::PolyDynamicsProblem<DIM>::numSets() const {
+BRY::bry_int_t BRY::SetDefinitions<DIM>::numSets() const {
     return workspace_sets.size() + init_sets.size() + unsafe_sets.size() + safe_sets.size();
 }
 
@@ -110,110 +110,151 @@ template <std::size_t DIM>
 const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices(bool store_tf_matrices) const {
     INFO("Creating constraint matrices");
 
-    Matrix Phi_m = BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, degree_increase);
+    //Matrix Phi_m = BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, degree_increase);
+    bry_int_t p = dynamics->composedDegree(barrier_deg);
+
+    // Map containing all of the Phi_m transformation matrices for each bernstein conversion degree increase to prevent duplicate Phi matrices
+    std::map<bry_int_t, Matrix> Phi_m;
+    std::map<bry_int_t, Matrix> Phi_p;
+
+    // Keep track of all of the 
+    bry_int_t n_ws_constraints = 0, n_init_constraints = 0, n_unsafe_constraints = 0, n_safe_constraints = 0;
+
+    for (const DegHyperRectangle<DIM>& set : this->workspace_sets) {
+        /// Check if there is a Phi with the corresponding degree increase 
+        auto it = Phi_m.find(set.bernstein_degree_increase);
+        if (it == Phi_m.end()) {
+            it = Phi_m.emplace(set.bernstein_degree_increase, BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, set.bernstein_degree_increase)).first;
+        } 
+        // Count the number of constraints for matrix allocation later
+        n_ws_constraints += it->second.rows();
+    }
+    for (const DegHyperRectangle<DIM>& set : this->init_sets) {
+        auto it = Phi_m.find(set.bernstein_degree_increase);
+        if (it == Phi_m.end()) {
+            Phi_m.emplace(set.bernstein_degree_increase, BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, set.bernstein_degree_increase));
+        }
+        n_init_constraints += it->second.rows();
+    }
+    for (const DegHyperRectangle<DIM>& set : this->unsafe_sets) {
+        auto it = Phi_m.find(set.bernstein_degree_increase);
+        if (it == Phi_m.end()) {
+            Phi_m.emplace(set.bernstein_degree_increase, BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, set.bernstein_degree_increase));
+        }
+        n_unsafe_constraints += it->second.rows();
+    }
+    for (const DegHyperRectangle<DIM>& set : this->safe_sets) {
+        auto it = Phi_p.find(set.bernstein_degree_increase);
+        if (it == Phi_p.end()) {
+            Phi_p.emplace(set.bernstein_degree_increase, BernsteinBasisTransform<DIM>::pwrToBernMatrix(p, set.bernstein_degree_increase));
+        }
+        n_safe_constraints += it->second.rows();
+    }
 
     std::unique_ptr<std::map<ConstraintID, Matrix>> cached_constraint_matrices(store_tf_matrices ? new std::map<ConstraintID, Matrix>() : nullptr);
 
-    bry_int_t n_cols = Phi_m.cols() + 2;
+    // Phi_m is guaranteed to atleast have one matrix in it, and all of the matrices must have the same number of columns, so look it up there
+    bry_int_t n_cols = Phi_m.begin()->second.cols() + 2;
 
     // Workspace
-    if (workspace_sets.empty())
+    if (this->workspace_sets.empty())
         WARN("No workspace was provided");
-    Matrix ws_coeffs(workspace_sets.size() * Phi_m.rows(), n_cols);
-    Vector ws_lower_bound = Vector::Zero(ws_coeffs.rows());
-    bry_int_t i = 0;
-    for (const HyperRectangle<DIM>& set : workspace_sets) {
+    Matrix ws_coeffs(n_ws_constraints, n_cols);
+    Vector ws_lower_bound = Vector::Zero(n_ws_constraints);
+    bry_int_t constraint_idx = 0;
+    for (const DegHyperRectangle<DIM>& set : this->workspace_sets) {
         Matrix tf = set.transformationMatrix(barrier_deg);
-        Matrix beta_coeffs = Phi_m * tf;
+        Matrix b_coeffs = Phi_m.at(set.bernstein_degree_increase) * tf;
 
         if (store_tf_matrices) {
             bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Workspace, i}, std::move(tf)).second;
             ASSERT(inserted, "Duplicate constraint ID found");
         }
 
-        Matrix coeffs(beta_coeffs.rows(), n_cols);
-        coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
-        ws_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
+        Matrix coeffs(b_coeffs.rows(), n_cols);
+        coeffs << b_coeffs, Vector::Zero(b_coeffs.rows()), Vector::Zero(b_coeffs.rows());
+        ws_coeffs.block(constraint_idx, 0, Phi_m.rows(), n_cols) = coeffs;
+        constraint_idx += b_coeffs.rows();
     }
     INFO("Workspace constraints done. Computing initial set constraints...");
 
     // Initial sets
-    if (init_sets.empty())
+    if (this->init_sets.empty())
         WARN("No initial sets were provided");
-    Matrix init_coeffs(init_sets.size() * Phi_m.rows(), n_cols);
-    Vector init_lower_bound = Vector::Zero(init_coeffs.rows());
-    i = 0;
-    for (const HyperRectangle<DIM>& set : init_sets) {
+    Matrix init_coeffs(n_init_constraints, n_cols);
+    Vector init_lower_bound = Vector::Zero(n_init_constraints);
+    constraint_idx = 0;
+    for (const HyperRectangle<DIM>& set : this->init_sets) {
         Matrix tf = -set.transformationMatrix(barrier_deg);
-        Matrix beta_coeffs = Phi_m * tf;
+        Matrix b_coeffs = Phi_m.at(set.bernstein_degree_increase) * tf;
 
         if (store_tf_matrices) {
             bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Init, i}, std::move(tf)).second;
             ASSERT(inserted, "Duplicate constraint ID found");
         }
 
-        Matrix coeffs(beta_coeffs.rows(), n_cols);
-        coeffs << beta_coeffs, Vector::Ones(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
-        init_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
+        Matrix coeffs(b_coeffs.rows(), n_cols);
+        coeffs << b_coeffs, Vector::Ones(b_coeffs.rows()), Vector::Zero(b_coeffs.rows());
+        init_coeffs.block(constraint_idx, 0, Phi_m.rows(), n_cols) = coeffs;
+        constraint_idx += b_coeffs.rows();
     }
     INFO("Initial sets done. Computing unsafe set constraints...");
 
     // Unsafe sets
-    if (unsafe_sets.empty())
+    if (this->unsafe_sets.empty())
         WARN("No unsafe sets were provided");
-    Matrix unsafe_coeffs(unsafe_sets.size() * Phi_m.rows(), n_cols);
-    Vector unsafe_lower_bound = Vector::Ones(unsafe_coeffs.rows());
-    i = 0;
-    for (const HyperRectangle<DIM>& set : unsafe_sets) {
+    Matrix unsafe_coeffs(n_unsafe_constraints, n_cols);
+    Vector unsafe_lower_bound = Vector::Ones(n_unsafe_constraints);
+    constraint_idx = 0;
+    for (const HyperRectangle<DIM>& set : this->unsafe_sets) {
         Matrix tf = set.transformationMatrix(barrier_deg);
-        Matrix beta_coeffs = Phi_m * tf;
+        Matrix b_coeffs = Phi_m.at(set.bernstein_degree_increase) * tf;
 
         if (store_tf_matrices) {
             bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Unsafe, i}, std::move(tf)).second;
             ASSERT(inserted, "Duplicate constraint ID found");
         }
 
-        Matrix coeffs(beta_coeffs.rows(), n_cols);
-        coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
-        unsafe_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
+        Matrix coeffs(b_coeffs.rows(), n_cols);
+        coeffs << b_coeffs, Vector::Zero(b_coeffs.rows()), Vector::Zero(b_coeffs.rows());
+        unsafe_coeffs.block(constraint_idx, 0, Phi_m.rows(), n_cols) = coeffs;
+        constraint_idx += b_coeffs.rows();
     }
     INFO("Unsafe sets done. Computing safe set constraints...");
 
     // Safe sets
-    if (safe_sets.empty())
+    if (this->safe_sets.empty())
         WARN("No safe sets were provided");
     //DEBUG("Dynamics power matrix: \n" << dynamics->dynamicsPowerMatrix(barrier_deg));
     //DEBUG("Noise matrix: \n" << noise->additiveNoiseMatrix(barrier_deg));
-    DEBUG("b4 f expec gamma compute");
+    //DEBUG("b4 f expec gamma compute");
     Matrix F_expec_Gamma = dynamics->dynamicsPowerMatrix(barrier_deg) * noise->additiveNoiseMatrix(barrier_deg);
-    DEBUG("af f expec gamma compute");
-    bry_int_t p = dynamics->composedDegree(barrier_deg);
-    DEBUG("b4 phi p");
-    Matrix Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(p, degree_increase);
-    DEBUG("af phi p (size: " << Phi_p.size());
+    //DEBUG("af f expec gamma compute");
+    //DEBUG("b4 phi p");
+    //Matrix Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(p, degree_increase);
+    //DEBUG("af phi p (size: " << Phi_p.size());
     Vector gamma_coeffs = Vector::Ones(Phi_p.cols());
     ASSERT(F_expec_Gamma.rows() == Phi_p.cols(), "Dimension mismatch between F and Phi (p)");
 
     Matrix safe_coeffs(safe_sets.size() * Phi_p.rows(), n_cols);
     Vector safe_lower_bound = Vector::Zero(safe_coeffs.rows());
-    i = 0;
 
     Matrix deg_lift_tf = makeDegreeChangeTransform<DIM>(barrier_deg, p);
 
-    for (const HyperRectangle<DIM>& set : safe_sets) {
-        DEBUG("b4 tf");
+    constraint_idx = 0;
+    for (const HyperRectangle<DIM>& set : this->safe_sets) {
         Matrix tf = -set.transformationMatrix(p) * (F_expec_Gamma - deg_lift_tf);
-        DEBUG("af tf");
-        Matrix beta_coeffs = Phi_p * tf;
+        Matrix b_coeffs = Phi_p * tf;
 
         if (store_tf_matrices) {
             bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Safe, i}, std::move(tf)).second;
             ASSERT(inserted, "Duplicate constraint ID found");
         }
         
-        Matrix coeffs(beta_coeffs.rows(), n_cols);
-        coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Ones(beta_coeffs.rows());
-        safe_coeffs.block(Phi_p.rows() * i++, 0, Phi_p.rows(), n_cols) = coeffs;
+        Matrix coeffs(b_coeffs.rows(), n_cols);
+        coeffs << b_coeffs, Vector::Zero(b_coeffs.rows()), Vector::Ones(b_coeffs.rows());
+        safe_coeffs.block(constraint_idx, 0, Phi_p.rows(), n_cols) = coeffs;
+        constraint_idx += b_coeffs.rows();
     }
     INFO("Safe sets done.");
 

@@ -15,6 +15,11 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
 
     public:
         virtual const ConstraintMatrices<DIM> getConstraintMatrices(bool store_tf_matrices = false) const override;
+
+    private:
+        struct State {
+               
+        };
 };
 
 }

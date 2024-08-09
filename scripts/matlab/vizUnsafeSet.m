@@ -1,7 +1,7 @@
 function vizUnsafeSet(bounds)
     cap = 5.5;
     vertices = zeros(8, 3);
-    ceil_val = 1.0;
+    ceil_val = 0.01;
     vertices(1, :) = [bounds(1), bounds(3), 0];
     vertices(2, :) = [bounds(2), bounds(3), 0];
     vertices(3, :) = [bounds(2), bounds(4), 0];
