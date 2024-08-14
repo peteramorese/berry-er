@@ -3,7 +3,7 @@
 #include "Tools.h"
 
 template <std::size_t DIM>
-std::list<BRY::HyperRectangle<DIM>> BRY::makeRectBoundary(const HyperRectangle<DIM>& workspace, bry_float_t boundary_width) {
+std::list<BRY::HyperRectangle<DIM>> BRY::makeRectBoundary(const HyperRectangle<DIM>& workspace, bry_float_t boundary_width, bry_int_t degree_increase) {
     std::list<BRY::HyperRectangle<DIM>> boundary_sets;
     for (bry_int_t d = 0; d < DIM; ++d) {
         Eigen::Vector<bry_float_t, DIM> boundary_width_vec;
@@ -11,6 +11,7 @@ std::list<BRY::HyperRectangle<DIM>> BRY::makeRectBoundary(const HyperRectangle<D
 
         // Inflate the workspace by the boundary width
         HyperRectangle<DIM> h_lower = workspace;
+        h_lower.bernstein_deg_incr = degree_increase;
         h_lower.lower_bounds -= boundary_width_vec;
         h_lower.upper_bounds += boundary_width_vec;
 

@@ -2,6 +2,7 @@
 #include "Noise.h"
 #include "HyperRectangle.h"
 #include "Synthesis.h"
+#include "Tools.h"
 
 #include "lemon/ArgParser.h"
 
@@ -51,8 +52,6 @@ int main(int argc, char** argv) {
     cov(1, 1) = 0.01;
     prob->noise.reset(new AdditiveGaussianNoise<DIM>(cov));
 
-    Eigen::Vector<bry_float_t, DIM> boundary_width{0.2, 0.2};
-
     auto printSetBounds = [](const HyperRectangle<DIM>& set) {
         DEBUG("Set bounds: [" 
             << set.lower_bounds(0) << ", " 
@@ -63,8 +62,9 @@ int main(int argc, char** argv) {
 
 
     HyperRectangle<DIM> workspace;
-    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-1.0, -0.5) - boundary_width;
-    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.5, 0.5) + boundary_width;
+    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-1.0, -0.5);
+    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.5, 0.5);
+    workspace.bernstein_deg_incr = deg_increase.value();
     prob->setWorkspace(workspace);
     //DEBUG("Workspace set:");
     //printSetBounds(workspace);
@@ -75,44 +75,13 @@ int main(int argc, char** argv) {
     init_set.upper_bounds(0) = -0.6;
     init_set.lower_bounds(1) = -0.2;
     init_set.upper_bounds(1) = 0.0;
+    init_set.bernstein_deg_incr = deg_increase.value();
     prob->init_sets.push_back(init_set);
     //DEBUG("Init set:");
     //printSetBounds(init_set);
     
-    //DEBUG("Unsafe sets:");
-    // Unsafe set
-    HyperRectangle<DIM> boundary_left;
-    // Boundary left
-    boundary_left.lower_bounds(0) = -1.0 - boundary_width(0);
-    boundary_left.upper_bounds(0) = -1.0;
-    boundary_left.lower_bounds(1) = -0.5 - boundary_width(1);
-    boundary_left.upper_bounds(1) = 0.5 + boundary_width(1);
-    prob->unsafe_sets.push_back(boundary_left);
-    //printSetBounds(boundary_left);
-    // Boundary right
-    HyperRectangle<DIM> boundary_right;
-    boundary_right.lower_bounds(0) = 0.5;
-    boundary_right.upper_bounds(0) = 0.5 + boundary_width(0);
-    boundary_right.lower_bounds(1) = -0.5 - boundary_width(1);
-    boundary_right.upper_bounds(1) = 0.5 + boundary_width(1);
-    prob->unsafe_sets.push_back(boundary_right);
-    //printSetBounds(boundary_right);
-    // Boundary top
-    HyperRectangle<DIM> boundary_top;
-    boundary_top.lower_bounds(0) = -1.0;
-    boundary_top.upper_bounds(0) = 0.5;
-    boundary_top.lower_bounds(1) = 0.5;
-    boundary_top.upper_bounds(1) = 0.5 + boundary_width(1);
-    prob->unsafe_sets.push_back(boundary_top);
-    //printSetBounds(boundary_top);
-    // Boundary bottom
-    HyperRectangle<DIM> boundary_bottom;
-    boundary_bottom.lower_bounds(0) = -1.0;
-    boundary_bottom.upper_bounds(0) = 0.5;
-    boundary_bottom.lower_bounds(1) = -0.5 - boundary_width(1);
-    boundary_bottom.upper_bounds(1) = -0.5;
-    prob->unsafe_sets.push_back(boundary_bottom);
-    //printSetBounds(boundary_bottom);
+    prob->unsafe_sets = makeRectBoundary(workspace, 0.2, deg_increase.value());
+
     if (non_convex) {
         // Non convex unsafe regions
         HyperRectangle<DIM> upper_region;
@@ -120,6 +89,7 @@ int main(int argc, char** argv) {
         upper_region.upper_bounds(0) = -0.53;
         upper_region.lower_bounds(1) = -0.17;
         upper_region.upper_bounds(1) = -0.13;
+        upper_region.bernstein_deg_incr = deg_increase.value();
         prob->unsafe_sets.push_back(upper_region);
         //printSetBounds(upper_region);
         HyperRectangle<DIM> lower_region;
@@ -127,6 +97,7 @@ int main(int argc, char** argv) {
         lower_region.upper_bounds(0) = -0.53;
         lower_region.lower_bounds(1) = 0.28;
         lower_region.upper_bounds(1) = 0.32;
+        lower_region.bernstein_deg_incr = deg_increase.value();
         prob->unsafe_sets.push_back(lower_region);
         //printSetBounds(lower_region);
     }
@@ -139,6 +110,7 @@ int main(int argc, char** argv) {
         safe_set.upper_bounds(0) = 0.5;
         safe_set.lower_bounds(1) = -0.5;
         safe_set.upper_bounds(1) = 0.5;
+        safe_set.bernstein_deg_incr = deg_increase.value();
         prob->safe_sets.push_back(safe_set);
     } else {
         std::list<HyperRectangle<DIM>>& safe_sets = prob->safe_sets;
@@ -148,6 +120,7 @@ int main(int argc, char** argv) {
             set.upper_bounds(0) = -0.57;
             set.lower_bounds(1) = -0.5;
             set.upper_bounds(1) = 0.5;
+            set.bernstein_deg_incr = deg_increase.value();
             safe_sets.push_back(set);
         }
 
@@ -157,6 +130,7 @@ int main(int argc, char** argv) {
             set.upper_bounds(0) = -0.53;
             set.lower_bounds(1) = -0.5;
             set.upper_bounds(1) = -0.17;
+            set.bernstein_deg_incr = deg_increase.value();
             safe_sets.push_back(set);
         }
 
@@ -166,6 +140,7 @@ int main(int argc, char** argv) {
             set.upper_bounds(0) = -0.53;
             set.lower_bounds(1) = -0.13;
             set.upper_bounds(1) = 0.28;
+            set.bernstein_deg_incr = deg_increase.value();
             safe_sets.push_back(set);
         }
 
@@ -175,6 +150,7 @@ int main(int argc, char** argv) {
             set.upper_bounds(0) = -0.53;
             set.lower_bounds(1) = 0.32;
             set.upper_bounds(1) = 0.5;
+            set.bernstein_deg_incr = deg_increase.value();
             safe_sets.push_back(set);
         }
 
@@ -184,6 +160,7 @@ int main(int argc, char** argv) {
             set.upper_bounds(0) = 0.5;
             set.lower_bounds(1) = -0.5;
             set.upper_bounds(1) = 0.5;
+            set.bernstein_deg_incr = deg_increase.value();
             safe_sets.push_back(set);
         }
     }

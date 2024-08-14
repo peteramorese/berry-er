@@ -2,6 +2,7 @@
 #include "Noise.h"
 #include "HyperRectangle.h"
 #include "Synthesis.h"
+#include "Tools.h"
 
 #include "lemon/ArgParser.h"
 
@@ -79,8 +80,8 @@ int main(int argc, char** argv) {
     
     //DEBUG("Unsafe sets:");
     std::list<HyperRectangle<DIM>> boundary_sets = makeRectBoundary(workspace, 0.2);
-    workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-1.0, -0.5) - boundary_width;
-    workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.5, 0.5) + boundary_width;
+    //workspace.lower_bounds = Eigen::Vector<bry_float_t, DIM>(-1.0, -0.5) - boundary_width;
+    //workspace.upper_bounds = Eigen::Vector<bry_float_t, DIM>(0.5, 0.5) + boundary_width;
     prob->unsafe_sets = boundary_sets;
     //printSetBounds(boundary_bottom);
     if (non_convex) {

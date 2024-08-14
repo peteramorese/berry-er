@@ -10,6 +10,8 @@ struct HyperRectangle {
         Eigen::Vector<bry_float_t, DIM> lower_bounds = Eigen::Vector<bry_float_t, DIM>::Constant(0.0);
         Eigen::Vector<bry_float_t, DIM> upper_bounds = Eigen::Vector<bry_float_t, DIM>::Constant(1.0);
 
+        /// @brief Degree of the bernstein conversion
+        bry_int_t bernstein_deg_incr = 0;
     public:
         HyperRectangle() = default;
 
@@ -17,6 +19,8 @@ struct HyperRectangle {
         /// @param lower_default Lower bound for all dims
         /// @param upper_default Upper bound for all dims
         HyperRectangle(bry_float_t lower_default, bry_float_t upper_default);
+
+        HyperRectangle(bry_float_t lower_default, bry_float_t upper_default, bry_int_t degree_increase);
 
         Matrix transformationMatrix(bry_int_t m) const;
 

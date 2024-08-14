@@ -14,6 +14,13 @@ BRY::HyperRectangle<DIM>::HyperRectangle(bry_float_t lower_default, bry_float_t 
 {}
 
 template <std::size_t DIM>
+BRY::HyperRectangle<DIM>::HyperRectangle(bry_float_t lower_default, bry_float_t upper_default, bry_int_t degree_increase)
+    : lower_bounds(Eigen::Vector<bry_float_t, DIM>::Constant(lower_default))
+    , upper_bounds(Eigen::Vector<bry_float_t, DIM>::Constant(upper_default))
+    , bernstein_deg_incr(degree_increase)
+{}
+
+template <std::size_t DIM>
 BRY::Matrix BRY::HyperRectangle<DIM>::transformationMatrix(bry_int_t m) const {
     BRY::bry_int_t m_monoms = pow(m + 1, DIM);
 

@@ -87,11 +87,11 @@ void BRY::SetDefinitions<DIM>::subdivide(uint32_t subdivision) {
         WARN("Subdivision is less than 2 (no effect)");
         return;
     }
-    auto divide = [&] (std::list<DegHyperRectangle<DIM>>& subd_sets) {
-        const std::list<DegHyperRectangle<DIM>> original_sets = subd_sets;
+    auto divide = [&] (std::list<HyperRectangle<DIM>>& subd_sets) {
+        const std::list<HyperRectangle<DIM>> original_sets = subd_sets;
         subd_sets.clear();
         for (const auto& set : original_sets) {
-            std::vector<DegHyperRectangle<DIM>> subd_sets_to_insert = set.subdivide(subdivision);
+            std::vector<HyperRectangle<DIM>> subd_sets_to_insert = set.subdivide(subdivision);
             subd_sets.insert(subd_sets.end(), subd_sets_to_insert.begin(), subd_sets_to_insert.end());
         }
     };
@@ -120,33 +120,33 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     // Keep track of all of the 
     bry_int_t n_ws_constraints = 0, n_init_constraints = 0, n_unsafe_constraints = 0, n_safe_constraints = 0;
 
-    for (const DegHyperRectangle<DIM>& set : this->workspace_sets) {
+    for (const HyperRectangle<DIM>& set : this->workspace_sets) {
         /// Check if there is a Phi with the corresponding degree increase 
-        auto it = Phi_m.find(set.bernstein_degree_increase);
+        auto it = Phi_m.find(set.bernstein_deg_incr);
         if (it == Phi_m.end()) {
-            it = Phi_m.emplace(set.bernstein_degree_increase, BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, set.bernstein_degree_increase)).first;
+            it = Phi_m.emplace(set.bernstein_deg_incr, BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, set.bernstein_deg_incr)).first;
         } 
         // Count the number of constraints for matrix allocation later
         n_ws_constraints += it->second.rows();
     }
-    for (const DegHyperRectangle<DIM>& set : this->init_sets) {
-        auto it = Phi_m.find(set.bernstein_degree_increase);
+    for (const HyperRectangle<DIM>& set : this->init_sets) {
+        auto it = Phi_m.find(set.bernstein_deg_incr);
         if (it == Phi_m.end()) {
-            Phi_m.emplace(set.bernstein_degree_increase, BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, set.bernstein_degree_increase));
+            it = Phi_m.emplace(set.bernstein_deg_incr, BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, set.bernstein_deg_incr)).first;
         }
         n_init_constraints += it->second.rows();
     }
-    for (const DegHyperRectangle<DIM>& set : this->unsafe_sets) {
-        auto it = Phi_m.find(set.bernstein_degree_increase);
+    for (const HyperRectangle<DIM>& set : this->unsafe_sets) {
+        auto it = Phi_m.find(set.bernstein_deg_incr);
         if (it == Phi_m.end()) {
-            Phi_m.emplace(set.bernstein_degree_increase, BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, set.bernstein_degree_increase));
+            it = Phi_m.emplace(set.bernstein_deg_incr, BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, set.bernstein_deg_incr)).first;
         }
         n_unsafe_constraints += it->second.rows();
     }
-    for (const DegHyperRectangle<DIM>& set : this->safe_sets) {
-        auto it = Phi_p.find(set.bernstein_degree_increase);
+    for (const HyperRectangle<DIM>& set : this->safe_sets) {
+        auto it = Phi_p.find(set.bernstein_deg_incr);
         if (it == Phi_p.end()) {
-            Phi_p.emplace(set.bernstein_degree_increase, BernsteinBasisTransform<DIM>::pwrToBernMatrix(p, set.bernstein_degree_increase));
+            it = Phi_p.emplace(set.bernstein_deg_incr, BernsteinBasisTransform<DIM>::pwrToBernMatrix(p, set.bernstein_deg_incr)).first;
         }
         n_safe_constraints += it->second.rows();
     }
@@ -161,19 +161,19 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
         WARN("No workspace was provided");
     Matrix ws_coeffs(n_ws_constraints, n_cols);
     Vector ws_lower_bound = Vector::Zero(n_ws_constraints);
-    bry_int_t constraint_idx = 0;
-    for (const DegHyperRectangle<DIM>& set : this->workspace_sets) {
+    bry_int_t constraint_idx = 0, i = 0;
+    for (const HyperRectangle<DIM>& set : this->workspace_sets) {
         Matrix tf = set.transformationMatrix(barrier_deg);
-        Matrix b_coeffs = Phi_m.at(set.bernstein_degree_increase) * tf;
+        Matrix b_coeffs = Phi_m.at(set.bernstein_deg_incr) * tf;
 
         if (store_tf_matrices) {
-            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Workspace, i}, std::move(tf)).second;
+            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Workspace, i++}, std::move(tf)).second;
             ASSERT(inserted, "Duplicate constraint ID found");
         }
 
         Matrix coeffs(b_coeffs.rows(), n_cols);
         coeffs << b_coeffs, Vector::Zero(b_coeffs.rows()), Vector::Zero(b_coeffs.rows());
-        ws_coeffs.block(constraint_idx, 0, Phi_m.rows(), n_cols) = coeffs;
+        ws_coeffs.block(constraint_idx, 0, coeffs.rows(), n_cols) = coeffs;
         constraint_idx += b_coeffs.rows();
     }
     INFO("Workspace constraints done. Computing initial set constraints...");
@@ -184,18 +184,19 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     Matrix init_coeffs(n_init_constraints, n_cols);
     Vector init_lower_bound = Vector::Zero(n_init_constraints);
     constraint_idx = 0;
+    i = 0;
     for (const HyperRectangle<DIM>& set : this->init_sets) {
         Matrix tf = -set.transformationMatrix(barrier_deg);
-        Matrix b_coeffs = Phi_m.at(set.bernstein_degree_increase) * tf;
+        Matrix b_coeffs = Phi_m.at(set.bernstein_deg_incr) * tf;
 
         if (store_tf_matrices) {
-            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Init, i}, std::move(tf)).second;
+            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Init, i++}, std::move(tf)).second;
             ASSERT(inserted, "Duplicate constraint ID found");
         }
 
         Matrix coeffs(b_coeffs.rows(), n_cols);
         coeffs << b_coeffs, Vector::Ones(b_coeffs.rows()), Vector::Zero(b_coeffs.rows());
-        init_coeffs.block(constraint_idx, 0, Phi_m.rows(), n_cols) = coeffs;
+        init_coeffs.block(constraint_idx, 0, coeffs.rows(), n_cols) = coeffs;
         constraint_idx += b_coeffs.rows();
     }
     INFO("Initial sets done. Computing unsafe set constraints...");
@@ -206,18 +207,19 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     Matrix unsafe_coeffs(n_unsafe_constraints, n_cols);
     Vector unsafe_lower_bound = Vector::Ones(n_unsafe_constraints);
     constraint_idx = 0;
+    i = 0;
     for (const HyperRectangle<DIM>& set : this->unsafe_sets) {
         Matrix tf = set.transformationMatrix(barrier_deg);
-        Matrix b_coeffs = Phi_m.at(set.bernstein_degree_increase) * tf;
+        Matrix b_coeffs = Phi_m.at(set.bernstein_deg_incr) * tf;
 
         if (store_tf_matrices) {
-            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Unsafe, i}, std::move(tf)).second;
+            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Unsafe, i++}, std::move(tf)).second;
             ASSERT(inserted, "Duplicate constraint ID found");
         }
 
         Matrix coeffs(b_coeffs.rows(), n_cols);
         coeffs << b_coeffs, Vector::Zero(b_coeffs.rows()), Vector::Zero(b_coeffs.rows());
-        unsafe_coeffs.block(constraint_idx, 0, Phi_m.rows(), n_cols) = coeffs;
+        unsafe_coeffs.block(constraint_idx, 0, coeffs.rows(), n_cols) = coeffs;
         constraint_idx += b_coeffs.rows();
     }
     INFO("Unsafe sets done. Computing safe set constraints...");
@@ -225,35 +227,30 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     // Safe sets
     if (this->safe_sets.empty())
         WARN("No safe sets were provided");
-    //DEBUG("Dynamics power matrix: \n" << dynamics->dynamicsPowerMatrix(barrier_deg));
-    //DEBUG("Noise matrix: \n" << noise->additiveNoiseMatrix(barrier_deg));
-    //DEBUG("b4 f expec gamma compute");
     Matrix F_expec_Gamma = dynamics->dynamicsPowerMatrix(barrier_deg) * noise->additiveNoiseMatrix(barrier_deg);
-    //DEBUG("af f expec gamma compute");
-    //DEBUG("b4 phi p");
-    //Matrix Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(p, degree_increase);
-    //DEBUG("af phi p (size: " << Phi_p.size());
-    Vector gamma_coeffs = Vector::Ones(Phi_p.cols());
-    ASSERT(F_expec_Gamma.rows() == Phi_p.cols(), "Dimension mismatch between F and Phi (p)");
 
-    Matrix safe_coeffs(safe_sets.size() * Phi_p.rows(), n_cols);
+    ASSERT(F_expec_Gamma.rows() == Phi_p.begin()->second.cols(), "Dimension mismatch between F and Phi (p)");
+
+    Matrix safe_coeffs(n_safe_constraints, n_cols);
+    DEBUG("safe_coeffs size: " << safe_coeffs.rows() << ", " << safe_coeffs.cols());
     Vector safe_lower_bound = Vector::Zero(safe_coeffs.rows());
 
     Matrix deg_lift_tf = makeDegreeChangeTransform<DIM>(barrier_deg, p);
 
     constraint_idx = 0;
+    i = 0;
     for (const HyperRectangle<DIM>& set : this->safe_sets) {
         Matrix tf = -set.transformationMatrix(p) * (F_expec_Gamma - deg_lift_tf);
-        Matrix b_coeffs = Phi_p * tf;
+        Matrix b_coeffs = Phi_p.at(set.bernstein_deg_incr) * tf;
 
         if (store_tf_matrices) {
-            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Safe, i}, std::move(tf)).second;
+            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Safe, i++}, std::move(tf)).second;
             ASSERT(inserted, "Duplicate constraint ID found");
         }
         
         Matrix coeffs(b_coeffs.rows(), n_cols);
         coeffs << b_coeffs, Vector::Zero(b_coeffs.rows()), Vector::Ones(b_coeffs.rows());
-        safe_coeffs.block(constraint_idx, 0, Phi_p.rows(), n_cols) = coeffs;
+        safe_coeffs.block(constraint_idx, 0, coeffs.rows(), n_cols) = coeffs;
         constraint_idx += b_coeffs.rows();
     }
     INFO("Safe sets done.");
@@ -264,22 +261,30 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     constraint_matrices.b << ws_lower_bound, init_lower_bound, unsafe_lower_bound, safe_lower_bound;
 
     // Fill the constraint IDs
-    auto it = constraint_matrices.constraint_ids.begin();
-    for (bry_int_t set_i = 0; set_i < workspace_sets.size(); ++set_i) {
-        std::fill(it, std::next(it, Phi_m.rows()), ConstraintID{ConstraintType::Workspace, set_i});
-        std::advance(it, Phi_m.rows());
+    auto const_id_it = constraint_matrices.constraint_ids.begin();
+    auto set_it = this->workspace_sets.begin();
+    for (bry_int_t set_i = 0; set_i < this->workspace_sets.size(); ++set_i) {
+        bry_int_t n_constraints = Phi_m.find((set_it++)->bernstein_deg_incr)->second.rows();
+        std::fill(const_id_it, std::next(const_id_it, n_constraints), ConstraintID{ConstraintType::Workspace, set_i});
+        std::advance(const_id_it, n_constraints);
     }
-    for (bry_int_t set_i = 0; set_i < init_sets.size(); ++set_i) {
-        std::fill(it, std::next(it, Phi_m.rows()), ConstraintID{ConstraintType::Init, set_i});
-        std::advance(it, Phi_m.rows());
+    set_it = this->init_sets.begin();
+    for (bry_int_t set_i = 0; set_i < this->init_sets.size(); ++set_i) {
+        bry_int_t n_constraints = Phi_m.find((set_it++)->bernstein_deg_incr)->second.rows();
+        std::fill(const_id_it, std::next(const_id_it, n_constraints), ConstraintID{ConstraintType::Init, set_i});
+        std::advance(const_id_it, n_constraints);
     }
-    for (bry_int_t set_i = 0; set_i < unsafe_sets.size(); ++set_i) {
-        std::fill(it, std::next(it, Phi_m.rows()), ConstraintID{ConstraintType::Unsafe, set_i});
-        std::advance(it, Phi_m.rows());
+    set_it = this->unsafe_sets.begin();
+    for (bry_int_t set_i = 0; set_i < this->unsafe_sets.size(); ++set_i) {
+        bry_int_t n_constraints = Phi_m.find((set_it++)->bernstein_deg_incr)->second.rows();
+        std::fill(const_id_it, std::next(const_id_it, n_constraints), ConstraintID{ConstraintType::Unsafe, set_i});
+        std::advance(const_id_it, n_constraints);
     }
-    for (bry_int_t set_i = 0; set_i < safe_sets.size(); ++set_i) {
-        std::fill(it, std::next(it, Phi_p.rows()), ConstraintID{ConstraintType::Safe, set_i}); // Advance by Phi_p rows instead of Phi_m
-        std::advance(it, Phi_p.rows());
+    set_it = this->safe_sets.begin();
+    for (bry_int_t set_i = 0; set_i < this->safe_sets.size(); ++set_i) {
+        bry_int_t n_constraints = Phi_m.find((set_it++)->bernstein_deg_incr)->second.rows();
+        std::fill(const_id_it, std::next(const_id_it, n_constraints), ConstraintID{ConstraintType::Safe, set_i}); // Advance by Phi_p rows instead of Phi_m
+        std::advance(const_id_it, n_constraints);
     }
 
     constraint_matrices.transformation_matrices = std::move(cached_constraint_matrices);
@@ -298,27 +303,27 @@ std::list<BRY::HyperRectangle<DIM>>::iterator BRY::PolyDynamicsProblem<DIM>::loo
     switch (id.type) {
         case ConstraintType::Workspace: {
             #ifdef BRY_ENABLE_BOUNDS_CHECK
-                ASSERT(id.set_idx < workspace_sets.size(), "Set idx out of bounds (workspace sets)");
+                ASSERT(id.set_idx < this->workspace_sets.size(), "Set idx out of bounds (workspace sets)");
             #endif
-            return std::next(workspace_sets.begin(), id.set_idx);
+            return std::next(this->workspace_sets.begin(), id.set_idx);
         }
         case ConstraintType::Init: {
             #ifdef BRY_ENABLE_BOUNDS_CHECK
-                ASSERT(id.set_idx < init_sets.size(), "Set idx out of bounds (init sets)");
+                ASSERT(id.set_idx < this->init_sets.size(), "Set idx out of bounds (init sets)");
             #endif
-            return std::next(init_sets.begin(), id.set_idx);
+            return std::next(this->init_sets.begin(), id.set_idx);
         }
         case ConstraintType::Unsafe: {
             #ifdef BRY_ENABLE_BOUNDS_CHECK
-                ASSERT(id.set_idx < unsafe_sets.size(), "Set idx out of bounds (unsafe sets)");
+                ASSERT(id.set_idx < this->unsafe_sets.size(), "Set idx out of bounds (unsafe sets)");
             #endif
-            return std::next(unsafe_sets.begin(), id.set_idx);
+            return std::next(this->unsafe_sets.begin(), id.set_idx);
         }
         case ConstraintType::Safe: {
             #ifdef BRY_ENABLE_BOUNDS_CHECK
-                ASSERT(id.set_idx < safe_sets.size(), "Set idx out of bounds (safe sets)");
+                ASSERT(id.set_idx < this->safe_sets.size(), "Set idx out of bounds (safe sets)");
             #endif
-            return std::next(safe_sets.begin(), id.set_idx);
+            return std::next(this->safe_sets.begin(), id.set_idx);
         }
     }
     throw std::invalid_argument("ID is invalid");

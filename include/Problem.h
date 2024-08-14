@@ -79,22 +79,14 @@ struct ConstraintMatrices {
         bool m_filter_applied;
 };
 
-/// @brief Hyperrectangle that stores the degree of the bernstein conversion
-/// @tparam DIM 
-template <std::size_t DIM>
-struct DegHyperRectangle : public HyperRectangle<DIM> {
-    /// @brief Degree of the bernstein conversion
-    bry_int_t bernstein_degree_increase = 0;
-};
-
 /// @brief Struct containing all of the set bounding information for a synthesis problem
 template <std::size_t DIM>
 struct SetDefinitions {
     /* Set definitions */
-    std::list<DegHyperRectangle<DIM>> workspace_sets = {HyperRectangle<DIM>()};
-    std::list<DegHyperRectangle<DIM>> init_sets;
-    std::list<DegHyperRectangle<DIM>> unsafe_sets;
-    std::list<DegHyperRectangle<DIM>> safe_sets;
+    std::list<HyperRectangle<DIM>> workspace_sets = {HyperRectangle<DIM>()};
+    std::list<HyperRectangle<DIM>> init_sets;
+    std::list<HyperRectangle<DIM>> unsafe_sets;
+    std::list<HyperRectangle<DIM>> safe_sets;
 
     public:
         /// @brief Helper for setting the workspace from a single set
