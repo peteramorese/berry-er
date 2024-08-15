@@ -148,8 +148,6 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     BRY::ConstraintMatrices<DIM> constraint_matrices(std::accumulate(n_constraints.begin(), n_constraints.end(), 0), n_cols, barrier_deg);
 
     bry_int_t constraint_idx = 0;
-    //set_idx = 0;
-    //for (const auto&[set_type, set] : this->sets) {
     for (typename SetDefinitions<DIM>::ConstIterator it = this->sets.begin(); it != this->sets.end(); ++it) {
         const auto&[set_type, set] = *it;
         if (set_type != ConstraintType::Safe) {

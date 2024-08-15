@@ -31,6 +31,7 @@ struct SetDefinitions {
     std::multimap<ConstraintType, HyperRectangle<DIM>> sets;
 
     public:
+        using Iterator = std::map<ConstraintType, HyperRectangle<DIM>>::iterator;
         using ConstIterator = std::map<ConstraintType, HyperRectangle<DIM>>::const_iterator;
 
     public:

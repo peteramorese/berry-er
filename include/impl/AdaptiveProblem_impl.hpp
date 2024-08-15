@@ -3,158 +3,101 @@
 #include "AdaptiveProblem.h"
 
 template <std::size_t DIM>
-const BRY::ConstraintMatrices<DIM> BRY::AdaptiveProblem<DIM>::getConstraintMatrices(bool store_tf_matrices) const override {
+const BRY::ConstraintMatrices<DIM> BRY::AdaptiveProblem<DIM>::getConstraintMatrices() const {
 
+    // If there is no existing result, it must be the first iteration and thus return the normal constraint matrices
     if (!existing_result) {
-        return PolyDynamicsProblem<DIM>::
+        return PolyDynamicsProblem<DIM>::getConstraintMatrices();
     }
     INFO("Creating constraint matrices");
 
-
-    std::unique_ptr<std::map<ConstraintID, Matrix>> cached_constraint_matrices(store_tf_matrices ? new std::map<ConstraintID, Matrix>() : nullptr);
-
-
-    // Things fixed before the algorithm
-    bry_int_t n_cols = Phi_m.cols() + 2;
-    Matrix F_expec_Gamma = dynamics->dynamicsPowerMatrix(barrier_deg) * noise->additiveNoiseMatrix(barrier_deg);
+    // Degree of the composed polynomial
     bry_int_t p = dynamics->composedDegree(barrier_deg);
-
-    Matrix Phi_m = BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, degree_increase);
-    Matrix Phi_p = BernsteinBasisTransform<DIM>::pwrToBernMatrix(p, degree_increase);
-
-    ASSERT(F_expec_Gamma.rows() == Phi_p.cols(), "Dimension mismatch between F and Phi (p)");
-
-    Vector gamma_coeffs = Vector::Ones(Phi_p.cols());
-
-    auto bry_int_t nConstraints = [&]() {
-        return Phi_m.rows() * (workspace_sets.size() + init_sets.size() + unsafe_sets.size()) + Phi_p.rows() * (safe_sets.size());
-    };
-
-    while (nConstraints() < max_constraints) {}
-    // Workspace
-    if (workspace_sets.empty())
-        WARN("No workspace was provided");
-    Matrix ws_coeffs(workspace_sets.size() * Phi_m.rows(), n_cols);
-    Vector ws_lower_bound = Vector::Zero(ws_coeffs.rows());
-    bry_int_t i = 0;
-    for (const HyperRectangle<DIM>& set : workspace_sets) {
-        Matrix tf = set.transformationMatrix(barrier_deg);
-        Matrix beta_coeffs = Phi_m * tf;
-
-        if (store_tf_matrices) {
-            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Workspace, i}, std::move(tf)).second;
-            ASSERT(inserted, "Duplicate constraint ID found");
-        }
-
-        Matrix coeffs(beta_coeffs.rows(), n_cols);
-        coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
-        ws_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
-    }
-    INFO("Workspace constraints done. Computing initial set constraints...");
-
-    // Initial sets
-    if (init_sets.empty())
-        WARN("No initial sets were provided");
-    Matrix init_coeffs(init_sets.size() * Phi_m.rows(), n_cols);
-    Vector init_lower_bound = Vector::Zero(init_coeffs.rows());
-    i = 0;
-    for (const HyperRectangle<DIM>& set : init_sets) {
-        Matrix tf = -set.transformationMatrix(barrier_deg);
-        Matrix beta_coeffs = Phi_m * tf;
-
-        if (store_tf_matrices) {
-            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Init, i}, std::move(tf)).second;
-            ASSERT(inserted, "Duplicate constraint ID found");
-        }
-
-        Matrix coeffs(beta_coeffs.rows(), n_cols);
-        coeffs << beta_coeffs, Vector::Ones(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
-        init_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
-    }
-    INFO("Initial sets done. Computing unsafe set constraints...");
-
-    // Unsafe sets
-    if (unsafe_sets.empty())
-        WARN("No unsafe sets were provided");
-    Matrix unsafe_coeffs(unsafe_sets.size() * Phi_m.rows(), n_cols);
-    Vector unsafe_lower_bound = Vector::Ones(unsafe_coeffs.rows());
-    i = 0;
-    for (const HyperRectangle<DIM>& set : unsafe_sets) {
-        Matrix tf = set.transformationMatrix(barrier_deg);
-        Matrix beta_coeffs = Phi_m * tf;
-
-        if (store_tf_matrices) {
-            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Unsafe, i}, std::move(tf)).second;
-            ASSERT(inserted, "Duplicate constraint ID found");
-        }
-
-        Matrix coeffs(beta_coeffs.rows(), n_cols);
-        coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Zero(beta_coeffs.rows());
-        unsafe_coeffs.block(Phi_m.rows() * i++, 0, Phi_m.rows(), n_cols) = coeffs;
-    }
-    INFO("Unsafe sets done. Computing safe set constraints...");
-
-    // Safe sets
-    if (safe_sets.empty())
-        WARN("No safe sets were provided");
-    //DEBUG("Dynamics power matrix: \n" << dynamics->dynamicsPowerMatrix(barrier_deg));
-    //DEBUG("Noise matrix: \n" << noise->additiveNoiseMatrix(barrier_deg));
-    DEBUG("b4 f expec gamma compute");
-
-    Matrix safe_coeffs(safe_sets.size() * Phi_p.rows(), n_cols);
-    Vector safe_lower_bound = Vector::Zero(safe_coeffs.rows());
-    i = 0;
-
+    // Product F * E[Gamma]
+    Matrix F_expec_Gamma = dynamics->dynamicsPowerMatrix(barrier_deg) * noise->additiveNoiseMatrix(barrier_deg);
+    // Degree lift transform for the subtraction of F * E[Gamma] - B
     Matrix deg_lift_tf = makeDegreeChangeTransform<DIM>(barrier_deg, p);
 
-    for (const HyperRectangle<DIM>& set : safe_sets) {
-        DEBUG("b4 tf");
-        Matrix tf = -set.transformationMatrix(p) * (F_expec_Gamma - deg_lift_tf);
-        DEBUG("af tf");
-        Matrix beta_coeffs = Phi_p * tf;
+    // Map containing all of the Phi_m transformation matrices for each bernstein conversion degree increase to prevent duplicate Phi matrices
+    std::map<bry_int_t, Matrix> Phi_m;
+    std::map<bry_int_t, Matrix> Phi_p;
 
-        if (store_tf_matrices) {
-            bool inserted = cached_constraint_matrices->emplace(ConstraintID{ConstraintType::Safe, i}, std::move(tf)).second;
-            ASSERT(inserted, "Duplicate constraint ID found");
+    // Keep track of the number of constraints for each type
+    std::array<bry_int_t, 4> n_constraints = makeUniformArray<bry_int_t, 4>(0);
+    //bry_int_t n_ws_constraints = 0, n_init_constraints = 0, n_unsafe_constraints = 0, n_safe_constraints = 0;
+
+    for (const auto&[set_type, set] : this->sets) {
+        // Safe set constraints use the Phi_p container, all other constraints use Phi_m
+        std::map<bry_int_t, Matrix>& Phi_matrix_container = set_type != ConstraintType::Safe ? Phi_m : Phi_p;
+
+        bry_int_t Phi_deg = set_type != ConstraintType::Safe ? barrier_deg : p;
+
+        /// Check if there is a Phi with the corresponding degree increase 
+        auto it = Phi_matrix_container.find(set.bernstein_deg_incr);
+        if (it == Phi_matrix_container.end()) {
+            it = Phi_matrix_container.emplace(set.bernstein_deg_incr, BernsteinBasisTransform<DIM>::pwrToBernMatrix(Phi_deg, set.bernstein_deg_incr)).first;
+        } 
+        // Count the number of constraints for matrix allocation later
+        n_constraints[set_type] += it->second.rows();
+    }
+
+    // Phi_m is guaranteed to atleast have one matrix in it, and all of the matrices must have the same number of columns, so look it up there
+    bry_int_t n_cols = Phi_m.begin()->second.cols() + 2;
+
+    BRY::ConstraintMatrices<DIM> constraint_matrices(std::accumulate(n_constraints.begin(), n_constraints.end(), 0), n_cols, barrier_deg);
+
+    bry_int_t constraint_idx = 0;
+    for (typename SetDefinitions<DIM>::ConstIterator it = this->sets.begin(); it != this->sets.end(); ++it) {
+        const auto&[set_type, set] = *it;
+        if (set_type != ConstraintType::Safe) {
+            // Eta coeffs are 1 if the set is an initial set, otherwise they are zero
+            bry_float_t eta_coeff = static_cast<bry_float_t>(set_type == ConstraintType::Init);
+            // Lower bound is zero unless the set is of type unsafe, in which case the lb is 1
+            bry_float_t lb_coeff = static_cast<bry_float_t>(set_type == ConstraintType::Unsafe);
+            // If the set is an initial set, then negate the b coefficients
+            bry_float_t b_coeff_multiplier = (set_type == ConstraintType::Init) ? -1.0 : 1.0;
+
+            Matrix tf = b_coeff_multiplier * set.transformationMatrix(barrier_deg);
+            Matrix b_coeffs = Phi_m.at(set.bernstein_deg_incr) * tf;
+
+            Matrix A_mat_vals(b_coeffs.rows(), n_cols);
+
+            //            b         eta                                           gamma
+            A_mat_vals << b_coeffs, Vector::Constant(b_coeffs.rows(), eta_coeff), Vector::Zero(b_coeffs.rows());
+            constraint_matrices.A.block(constraint_idx, 0, A_mat_vals.rows(), A_mat_vals.cols()) = A_mat_vals;
+            constraint_matrices.b.segment(constraint_idx, A_mat_vals.rows()) = Vector::Constant(A_mat_vals.rows(), lb_coeff);
+            
+            // Assign the current set iterator to each constraint just added
+            for (bry_int_t i = constraint_idx; i < constraint_idx + A_mat_vals.rows(); ++i) {
+                constraint_matrices.constraint_sets[i] = it;
+            }
+
+            constraint_idx += A_mat_vals.rows();
+        } else {
+            Matrix tf = -set.transformationMatrix(p) * (F_expec_Gamma - deg_lift_tf);
+            Matrix b_coeffs = Phi_p.at(set.bernstein_deg_incr) * tf;
+
+            Matrix A_mat_vals(b_coeffs.rows(), n_cols);
+
+            //            b         eta                            gamma
+            A_mat_vals << b_coeffs, Vector::Zero(b_coeffs.rows()), Vector::Ones(b_coeffs.rows());
+            constraint_matrices.A.block(constraint_idx, 0, A_mat_vals.rows(), A_mat_vals.cols()) = A_mat_vals;
+            constraint_matrices.b.segment(constraint_idx, A_mat_vals.rows()) = Vector::Zero(A_mat_vals.rows());
+
+            // Assign the current set iterator to each constraint just added
+            for (bry_int_t i = constraint_idx; i < constraint_idx + A_mat_vals.rows(); ++i) {
+                constraint_matrices.constraint_sets[i] = it;
+            }
+
+            constraint_idx += A_mat_vals.rows();
         }
-        
-        Matrix coeffs(beta_coeffs.rows(), n_cols);
-        coeffs << beta_coeffs, Vector::Zero(beta_coeffs.rows()), Vector::Ones(beta_coeffs.rows());
-        safe_coeffs.block(Phi_p.rows() * i++, 0, Phi_p.rows(), n_cols) = coeffs;
-    }
-    INFO("Safe sets done.");
-
-    BRY::ConstraintMatrices<DIM> constraint_matrices(ws_coeffs.rows() + init_coeffs.rows() + unsafe_coeffs.rows() + safe_coeffs.rows(), n_cols, barrier_deg);
-
-    constraint_matrices.A << ws_coeffs, init_coeffs, unsafe_coeffs, safe_coeffs;
-    constraint_matrices.b << ws_lower_bound, init_lower_bound, unsafe_lower_bound, safe_lower_bound;
-
-    // Fill the constraint IDs
-    auto it = constraint_matrices.constraint_ids.begin();
-    for (bry_int_t set_i = 0; set_i < workspace_sets.size(); ++set_i) {
-        std::fill(it, std::next(it, Phi_m.rows()), ConstraintID{ConstraintType::Workspace, set_i});
-        std::advance(it, Phi_m.rows());
-    }
-    for (bry_int_t set_i = 0; set_i < init_sets.size(); ++set_i) {
-        std::fill(it, std::next(it, Phi_m.rows()), ConstraintID{ConstraintType::Init, set_i});
-        std::advance(it, Phi_m.rows());
-    }
-    for (bry_int_t set_i = 0; set_i < unsafe_sets.size(); ++set_i) {
-        std::fill(it, std::next(it, Phi_m.rows()), ConstraintID{ConstraintType::Unsafe, set_i});
-        std::advance(it, Phi_m.rows());
-    }
-    for (bry_int_t set_i = 0; set_i < safe_sets.size(); ++set_i) {
-        std::fill(it, std::next(it, Phi_p.rows()), ConstraintID{ConstraintType::Safe, set_i}); // Advance by Phi_p rows instead of Phi_m
-        std::advance(it, Phi_p.rows());
     }
 
-    constraint_matrices.transformation_matrices = std::move(cached_constraint_matrices);
+
     constraint_matrices.filter = filter;
     if (filter) {
         INFO("Applying filter...");
         constraint_matrices.applyFilter();
         INFO("Done!");
     }
-    INFO("Created constraint matrices");
-    return constraint_matrices;
 }
