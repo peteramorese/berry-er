@@ -5,6 +5,7 @@
 #include "Dynamics.h"
 #include "Noise.h"
 
+#include <map>
 
 namespace BRY {
 
@@ -53,13 +54,13 @@ struct ConstraintMatrices {
     std::shared_ptr<MonomialFilter<DIM>> filter;
 
     /// @brief Array with number elements equal to rows in `A` that identifies which set the constraint came from
-    std::vector<ConstraintID> constraint_ids;
+    //std::vector<ConstraintID> constraint_ids;
 
     /// @brief Map from each constrained set to the transformation matrix. Each transformation does NOT include 
     /// the Bernstein basis conversion, i.e., power basis barrier to power basis polynomial constraint to lower-bound.
     /// Pointer will not own any object if the matrices were not stored upon construction (see 
     /// `PolyDynamicsProblem::getConstraintMatrices()`)
-    std::unique_ptr<std::map<ConstraintID, Matrix>> transformation_matrices;
+    //std::unique_ptr<std::map<ConstraintID, Matrix>> transformation_matrices;
 
     /// @brief Determine if a filter has been applied to the matrices
     /// @return `true` if filter has been applied
@@ -83,23 +84,29 @@ struct ConstraintMatrices {
 template <std::size_t DIM>
 struct SetDefinitions {
     /* Set definitions */
-    std::list<HyperRectangle<DIM>> workspace_sets = {HyperRectangle<DIM>()};
-    std::list<HyperRectangle<DIM>> init_sets;
-    std::list<HyperRectangle<DIM>> unsafe_sets;
-    std::list<HyperRectangle<DIM>> safe_sets;
+    
+    std::multimap<ConstraintType, HyperRectangle<DIM>> sets;
+    //std::list<HyperRectangle<DIM>> workspace_sets = {HyperRectangle<DIM>()};
+    //std::list<HyperRectangle<DIM>> init_sets;
+    //std::list<HyperRectangle<DIM>> unsafe_sets;
+    //std::list<HyperRectangle<DIM>> safe_sets;
 
     public:
+        using ConstIterator = std::map<ConstraintType, HyperRectangle<DIM>>::const_iterator;
+
+    public:
+        std::pair<ConstIterator, ConstIterator> getSets(ConstraintType set_type) const;
+
+        template <typename IT>
+        void insertSets(ConstraintType set_type, IT begin, IT end);
+
         /// @brief Helper for setting the workspace from a single set
         /// @param workspace Hyper-rectangle workspace
         void setWorkspace(const HyperRectangle<DIM>& workspace);
 
-        /// @brief Subdivide the problem for less conservativeness
+        /// @brief Subdivide all sets 
         /// @param subdivision Integer number of subdivisions along one dimension
         void subdivide(uint32_t subdivision);
-
-        /// @brief Get the total number of sets across workspace, init, unsafe, and safe.
-        /// @return 
-        BRY_INL bry_int_t numSets() const;
 };
 
 template <std::size_t DIM>

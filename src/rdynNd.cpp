@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
 	lemon::ArgParser parser(argc, argv);
     lemon::Arg<lemon::ArgT::Check> verbose = parser.addDef<lemon::ArgT::Check>().flag('v').key("Verbose");
     lemon::Arg<lemon::ArgT::Check> non_convex = parser.addDef<lemon::ArgT::Check>().key("non-conv").description("Solve the non-convex synthesis problem (default to convex)");
-    lemon::Arg<lemon::ArgT::Check> adaptive = parser.addDef<lemon::ArgT::Check>().flag('a').description("Use the adaptive subdivision algorithm");
+    //lemon::Arg<lemon::ArgT::Check> adaptive = parser.addDef<lemon::ArgT::Check>().flag('a').description("Use the adaptive subdivision algorithm");
     lemon::Arg<lemon::ArgT::Check> export_matrices = parser.addDef<lemon::ArgT::Check>().flag('e').description("Export the matrices to use external solvers");
     lemon::Arg<lemon::ArgT::Value, std::string> filter = parser.addDef<lemon::ArgT::Value, std::string>().flag('f').key("filter").description("Select which filter to use").options({"diagdeg", "oddsum"});
     lemon::Arg<lemon::ArgT::Value, std::string> solver_id = parser.addDef<lemon::ArgT::Value, std::string>().key("solver").description("Solver ID").defaultValue("SCIP");
@@ -30,8 +30,8 @@ int main(int argc, char** argv) {
     lemon::Arg<lemon::ArgT::Value, bry_int_t> barrier_deg = parser.addDef<lemon::ArgT::Value, bry_int_t>().flag('d').key("deg").description("Barrier degree").required();
 	lemon::Arg<lemon::ArgT::Value, bry_int_t> deg_increase = parser.addDef<lemon::ArgT::Value, bry_int_t>().flag('i').key("deg-inc").defaultValue(0l).description("Barrier degree increase");
 	lemon::Arg<lemon::ArgT::Value, bry_int_t> subd = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("subd").flag('s').description("Barrier subdivision");
-	lemon::Arg<lemon::ArgT::Value, bry_int_t> ada_iters = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ada-iters").defaultValue(1l).description("Number of adaptive subdivision iterations (ONLY FOR ADAPTIVE)");
-	lemon::Arg<lemon::ArgT::Value, bry_int_t> ada_max_subdiv = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ada-max-subdiv").defaultValue(2l).description("Max number of sets divided each iteration (ONLY FOR ADAPTIVE)");
+	//lemon::Arg<lemon::ArgT::Value, bry_int_t> ada_iters = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ada-iters").defaultValue(1l).description("Number of adaptive subdivision iterations (ONLY FOR ADAPTIVE)");
+	//lemon::Arg<lemon::ArgT::Value, bry_int_t> ada_max_subdiv = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ada-max-subdiv").defaultValue(2l).description("Max number of sets divided each iteration (ONLY FOR ADAPTIVE)");
 	lemon::Arg<lemon::ArgT::Value, bry_int_t> time_steps = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ts").flag('t').defaultValue(10l).description("Number of time steps");
 	lemon::Arg<lemon::ArgT::Value, bry_float_t> boundary_width = parser.addDef<lemon::ArgT::Value, bry_float_t>().key("boundary-width").defaultValue(0.2).description("Width of the boundary region buffer (unsafe)");
     parser.enableHelp();
@@ -106,44 +106,36 @@ int main(int argc, char** argv) {
     init_set.upper_bounds(0) = -0.6;
     init_set.lower_bounds(1) = 0.0;
     init_set.upper_bounds(1) = 0.2;
-    prob->init_sets.push_back(init_set);
+    prob->sets.insert({ConstraintType::Init, init_set});
     if (verbose) {
         INFO("Initial set:");
         printSetBounds(init_set);
     }
     
     std::list<HyperRectangle<DIM>> boundary_sets = makeRectBoundary(workspace, boundary_width.value());
-    prob->unsafe_sets.insert(prob->unsafe_sets.end(), boundary_sets.begin(), boundary_sets.end());
+    prob->insertSets(ConstraintType::Unsafe, std::make_move_iterator(boundary_sets.begin()), std::make_move_iterator(boundary_sets.end()));
 
     if (non_convex) {
-        // BLOCKING OBSTACLE
+        // Non convex unsafe regions
         HyperRectangle<DIM> upper_region(-1.0, 1.0);
         upper_region.lower_bounds(0) = -0.57;
-        upper_region.upper_bounds(0) = -0.01;
+        upper_region.upper_bounds(0) = -0.53;
         upper_region.lower_bounds(1) = -0.17;
-        upper_region.upper_bounds(1) = 0.01;
-        prob->unsafe_sets.push_back(upper_region);
-
-        // Non convex unsafe regions
-        //HyperRectangle<DIM> upper_region(-1.0, 1.0);
-        //upper_region.lower_bounds(0) = -0.57;
-        //upper_region.upper_bounds(0) = -0.53;
-        //upper_region.lower_bounds(1) = -0.17;
-        //upper_region.upper_bounds(1) = -0.13;
-        //prob->unsafe_sets.push_back(upper_region);
+        upper_region.upper_bounds(1) = -0.13;
+        prob->sets.insert({ConstraintType::Unsafe, upper_region});
         //printSetBounds(upper_region);
-        //HyperRectangle<DIM> lower_region(-1.0, 1.0);
-        //lower_region.lower_bounds(0) = -0.57;
-        //lower_region.upper_bounds(0) = -0.53;
-        //lower_region.lower_bounds(1) = 0.28;
-        //lower_region.upper_bounds(1) = 0.32;
-        //prob->unsafe_sets.push_back(lower_region);
+        HyperRectangle<DIM> lower_region(-1.0, 1.0);
+        lower_region.lower_bounds(0) = -0.57;
+        lower_region.upper_bounds(0) = -0.53;
+        lower_region.lower_bounds(1) = 0.28;
+        lower_region.upper_bounds(1) = 0.32;
+        prob->sets.insert({ConstraintType::Unsafe, lower_region});
         //printSetBounds(lower_region);
     }
     if (verbose) {
         INFO("Unsafe sets:");
-        for (const auto& set : prob->unsafe_sets) {
-            printSetBounds(set);
+        for (auto[it, end] = prob->getSets(ConstraintType::Unsafe); it != end; ++it) {
+            printSetBounds(it->second);
         }
     }
     
@@ -157,16 +149,15 @@ int main(int argc, char** argv) {
         //safe_set.lower_bounds(1) = -0.5;
         //safe_set.upper_bounds(1) = 0.5;
         //prob->safe_sets.push_back(safe_set);
-        prob->safe_sets.push_back(workspace);
+        prob->sets.insert({ConstraintType::Safe, workspace});
     } else {
-        std::list<HyperRectangle<DIM>>& safe_sets = prob->safe_sets;
         {
             HyperRectangle<DIM> set(-1.0, 1.0);
             set.lower_bounds(0) = -1.0;
             set.upper_bounds(0) = -0.57;
             set.lower_bounds(1) = -0.5;
             set.upper_bounds(1) = 0.5;
-            safe_sets.push_back(set);
+            prob->sets.insert({ConstraintType::Safe, set});
         }
 
         {
@@ -175,7 +166,7 @@ int main(int argc, char** argv) {
             set.upper_bounds(0) = -0.53;
             set.lower_bounds(1) = -0.5;
             set.upper_bounds(1) = -0.17;
-            safe_sets.push_back(set);
+            prob->sets.insert({ConstraintType::Safe, set});
         }
 
         {
@@ -184,7 +175,7 @@ int main(int argc, char** argv) {
             set.upper_bounds(0) = -0.53;
             set.lower_bounds(1) = -0.13;
             set.upper_bounds(1) = 0.28;
-            safe_sets.push_back(set);
+            prob->sets.insert({ConstraintType::Safe, set});
         }
 
         {
@@ -193,7 +184,7 @@ int main(int argc, char** argv) {
             set.upper_bounds(0) = -0.53;
             set.lower_bounds(1) = 0.32;
             set.upper_bounds(1) = 0.5;
-            safe_sets.push_back(set);
+            prob->sets.insert({ConstraintType::Safe, set});
         }
 
         {
@@ -202,13 +193,13 @@ int main(int argc, char** argv) {
             set.upper_bounds(0) = 0.5;
             set.lower_bounds(1) = -0.5;
             set.upper_bounds(1) = 0.5;
-            safe_sets.push_back(set);
+            prob->sets.insert({ConstraintType::Safe, set});
         }
     }
     if (verbose) {
         INFO("Safe sets:");
-        for (const auto& set : prob->safe_sets) {
-            printSetBounds(set);
+        for (auto[it, end] = prob->getSets(ConstraintType::Safe); it != end; ++it) {
+            printSetBounds(it->second);
         }
     }
 
@@ -238,12 +229,12 @@ int main(int argc, char** argv) {
 
     INFO("Solving...");
     Timer t("total_time");
-    SynthesisResult<DIM> result;
-    if (adaptive) {
-        result = synthesizeAdaptive(*prob, ada_iters.value(), ada_max_subdiv.value(), solver_id.value());
-    } else {
-        result = synthesize(*prob, solver_id.value());
-    }
+    SynthesisResult<DIM> result = synthesize(*prob, solver_id.value());
+    //if (adaptive) {
+    //    result = synthesizeAdaptive(*prob, ada_iters.value(), ada_max_subdiv.value(), solver_id.value());
+    //} else {
+    //    result = synthesize(*prob, solver_id.value());
+    //}
     double total_time = t.now(BRY::TimeUnit::s);
     INFO("Done! (total time: " << total_time << ")");
     NEW_LINE;
