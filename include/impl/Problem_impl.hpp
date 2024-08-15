@@ -21,6 +21,7 @@ BRY::ConstraintMatrices<DIM>::ConstraintMatrices(bry_int_t n_constraints, bry_in
     : A(n_constraints, n_vars)
     , b(n_constraints)
     , barrier_deg(barrier_deg_)
+    , constraint_sets(n_constraints)
     , m_filter_applied(false)
 {
     ASSERT(A.cols() == pow(barrier_deg + 1, DIM) + 2, "Number of vars does not match barrier degree + 2");
@@ -32,6 +33,7 @@ BRY::ConstraintMatrices<DIM>::ConstraintMatrices(bry_int_t n_constraints, bry_in
     , b(n_constraints)
     , barrier_deg(barrier_deg_)
     , filter(filter_)
+    , constraint_sets(n_constraints)
     , m_filter_applied(false)
 {
     ASSERT(A.cols() == pow(barrier_deg + 1, DIM) + 2, "Number of vars does not match barrier degree + 2");
@@ -107,7 +109,7 @@ void BRY::SetDefinitions<DIM>::subdivide(uint32_t subdivision) {
 }
 
 template <std::size_t DIM>
-const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices(bool store_tf_matrices) const {
+const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices() const {
     INFO("Creating constraint matrices");
 
     // Degree of the composed polynomial
@@ -147,7 +149,9 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
 
     bry_int_t constraint_idx = 0;
     //set_idx = 0;
-    for (const auto&[set_type, set] : this->sets) {
+    //for (const auto&[set_type, set] : this->sets) {
+    for (typename SetDefinitions<DIM>::ConstIterator it = this->sets.begin(); it != this->sets.end(); ++it) {
+        const auto&[set_type, set] = *it;
         if (set_type != ConstraintType::Safe) {
             // Eta coeffs are 1 if the set is an initial set, otherwise they are zero
             bry_float_t eta_coeff = static_cast<bry_float_t>(set_type == ConstraintType::Init);
@@ -165,6 +169,12 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
             A_mat_vals << b_coeffs, Vector::Constant(b_coeffs.rows(), eta_coeff), Vector::Zero(b_coeffs.rows());
             constraint_matrices.A.block(constraint_idx, 0, A_mat_vals.rows(), A_mat_vals.cols()) = A_mat_vals;
             constraint_matrices.b.segment(constraint_idx, A_mat_vals.rows()) = Vector::Constant(A_mat_vals.rows(), lb_coeff);
+            
+            // Assign the current set iterator to each constraint just added
+            for (bry_int_t i = constraint_idx; i < constraint_idx + A_mat_vals.rows(); ++i) {
+                constraint_matrices.constraint_sets[i] = it;
+            }
+
             constraint_idx += A_mat_vals.rows();
         } else {
             Matrix tf = -set.transformationMatrix(p) * (F_expec_Gamma - deg_lift_tf);
@@ -176,6 +186,12 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
             A_mat_vals << b_coeffs, Vector::Zero(b_coeffs.rows()), Vector::Ones(b_coeffs.rows());
             constraint_matrices.A.block(constraint_idx, 0, A_mat_vals.rows(), A_mat_vals.cols()) = A_mat_vals;
             constraint_matrices.b.segment(constraint_idx, A_mat_vals.rows()) = Vector::Zero(A_mat_vals.rows());
+
+            // Assign the current set iterator to each constraint just added
+            for (bry_int_t i = constraint_idx; i < constraint_idx + A_mat_vals.rows(); ++i) {
+                constraint_matrices.constraint_sets[i] = it;
+            }
+
             constraint_idx += A_mat_vals.rows();
         }
     }
@@ -189,35 +205,4 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     }
     INFO("Created constraint matrices");
     return constraint_matrices;
-}
-
-template <std::size_t DIM>
-std::list<BRY::HyperRectangle<DIM>>::iterator BRY::PolyDynamicsProblem<DIM>::lookupSetFromConstraint(const ConstraintID& id) {
-    switch (id.type) {
-        case ConstraintType::Workspace: {
-            #ifdef BRY_ENABLE_BOUNDS_CHECK
-                ASSERT(id.set_idx < this->workspace_sets.size(), "Set idx out of bounds (workspace sets)");
-            #endif
-            return std::next(this->workspace_sets.begin(), id.set_idx);
-        }
-        case ConstraintType::Init: {
-            #ifdef BRY_ENABLE_BOUNDS_CHECK
-                ASSERT(id.set_idx < this->init_sets.size(), "Set idx out of bounds (init sets)");
-            #endif
-            return std::next(this->init_sets.begin(), id.set_idx);
-        }
-        case ConstraintType::Unsafe: {
-            #ifdef BRY_ENABLE_BOUNDS_CHECK
-                ASSERT(id.set_idx < this->unsafe_sets.size(), "Set idx out of bounds (unsafe sets)");
-            #endif
-            return std::next(this->unsafe_sets.begin(), id.set_idx);
-        }
-        case ConstraintType::Safe: {
-            #ifdef BRY_ENABLE_BOUNDS_CHECK
-                ASSERT(id.set_idx < this->safe_sets.size(), "Set idx out of bounds (safe sets)");
-            #endif
-            return std::next(this->safe_sets.begin(), id.set_idx);
-        }
-    }
-    throw std::invalid_argument("ID is invalid");
 }

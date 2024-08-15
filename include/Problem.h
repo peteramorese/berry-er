@@ -78,8 +78,8 @@ struct ConstraintMatrices {
     /// @brief Filter to apply to remove variables
     std::shared_ptr<MonomialFilter<DIM>> filter;
 
-    /// @brief Array with number elements equal to rows in `A` that identifies which set the constraint came from
-    //std::vector<ConstraintID> constraint_ids;
+    /// @brief Array with number elements equal to rows in `A` that stores pointers to the set that created the constraint
+    std::vector<typename SetDefinitions<DIM>::ConstIterator> constraint_sets;
 
     /// @brief Determine if a filter has been applied to the matrices
     /// @return `true` if filter has been applied
@@ -122,14 +122,8 @@ struct PolyDynamicsProblem : public SetDefinitions<DIM> {
 
     public:
         /// @brief Compute the constraint matrices
-        /// @param store_tf_matrices Returned object will cache the polynomial transformation matrices if true
         /// @return Constraint matrices object
-        virtual const ConstraintMatrices<DIM> getConstraintMatrices(bool store_tf_matrices = false) const;
-
-        /// @brief Given a constraint ID, get the corresponding set that the constraint belongs to
-        /// @param id ID of constraint
-        /// @return Iterator to the set in the set list corresponding to the constraint type
-        std::list<HyperRectangle<DIM>>::iterator lookupSetFromConstraint(const ConstraintID& id);
+        virtual const ConstraintMatrices<DIM> getConstraintMatrices() const;
 };
 
 }
