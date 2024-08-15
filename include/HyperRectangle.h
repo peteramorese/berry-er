@@ -22,6 +22,13 @@ struct HyperRectangle {
 
         HyperRectangle(bry_float_t lower_default, bry_float_t upper_default, bry_int_t degree_increase);
 
+        /// @brief Equality comparison to within floating point threshold
+        BRY_INL bool operator==(const HyperRectangle& other) const;
+        /// @brief Inequality lexicographic comparison in order: 
+        /// 1) bernstein_deg_incr, 2) lower_bounds, 3) upper_bounds
+        /// to within floating point threshold
+        bool operator<(const HyperRectangle& other) const;
+
         Matrix transformationMatrix(bry_int_t m) const;
 
         BRY_INL Eigen::Vector<bry_float_t, DIM> scaleToUnit() const;

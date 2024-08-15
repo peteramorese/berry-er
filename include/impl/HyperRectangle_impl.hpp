@@ -21,6 +21,41 @@ BRY::HyperRectangle<DIM>::HyperRectangle(bry_float_t lower_default, bry_float_t 
 {}
 
 template <std::size_t DIM>
+bool BRY::HyperRectangle<DIM>::operator==(const HyperRectangle& other) const {
+    return bernstein_deg_incr == other.bernstein_deg_incr
+        && ((lower_bounds - other.lower_bounds).norm() < BRY_FLOAT_DIFF_TOL)
+        && ((upper_bounds - other.upper_bounds).norm() < BRY_FLOAT_DIFF_TOL);
+}
+
+template <std::size_t DIM>
+bool BRY::HyperRectangle<DIM>::operator<(const HyperRectangle& other) const {
+    // Lexicographical comparison of two vectors
+    auto lexLess = [](const auto& v1, const auto& v2) -> bool {
+        for (bry_int_t i = 0; i < v1.size(); ++i) {
+            if (v1[i] < (v2[i] - BRY_FLOAT_DIFF_TOL)) {
+                return true;
+            } else if (v1[i] > (v2[i] + BRY_FLOAT_DIFF_TOL)) {
+                return false;
+            }
+        }
+        return false;
+    };
+
+    if (bernstein_deg_incr < other.bernstein_deg_incr) {
+        return true;
+    } else if (bernstein_deg_incr > other.bernstein_deg_incr) {
+        return false;
+    } else if (lexLess(lower_bounds, other.lower_bounds)) {
+        return true;
+    } else if (lexLess(other.lower_bounds, lower_bounds)) {
+        return false;
+    } else if (lexLess(upper_bounds, other.upper_bounds)) {
+        return true;
+    } 
+    return false;
+}
+
+template <std::size_t DIM>
 BRY::Matrix BRY::HyperRectangle<DIM>::transformationMatrix(bry_int_t m) const {
     BRY::bry_int_t m_monoms = pow(m + 1, DIM);
 
