@@ -35,6 +35,9 @@ struct SetDefinitions {
         using ConstIterator = std::map<ConstraintType, HyperRectangle<DIM>>::const_iterator;
 
     public:
+        /// @brief Lex comparison forwarding for uniqueness checking and key ordering
+        BRY_INL bool operator<(const SetDefinitions& other) const;
+
         std::pair<ConstIterator, ConstIterator> getSets(ConstraintType set_type) const;
 
         template <typename IT>

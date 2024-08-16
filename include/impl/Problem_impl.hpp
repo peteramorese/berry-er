@@ -17,6 +17,44 @@ bool BRY::ConstraintID::operator<(const ConstraintID& other) const {
 }
 
 template <std::size_t DIM>
+bool BRY::SetDefinitions<DIM>::operator<(const SetDefinitions& other) const {
+    return sets < other.sets;
+}
+
+template <std::size_t DIM>
+std::pair<typename BRY::SetDefinitions<DIM>::ConstIterator, typename BRY::SetDefinitions<DIM>::ConstIterator> BRY::SetDefinitions<DIM>::getSets(ConstraintType set_type) const {
+    return std::make_pair(sets.lower_bound(set_type), sets.upper_bound(set_type));
+}
+
+template <std::size_t DIM>
+template <typename IT>
+void BRY::SetDefinitions<DIM>::insertSets(ConstraintType set_type, IT begin, IT end) {
+    for (IT it = begin; it != end; ++it) {
+        sets.insert(std::make_pair(set_type, *it));
+    }
+}
+
+template <std::size_t DIM>
+void BRY::SetDefinitions<DIM>::setWorkspace(const HyperRectangle<DIM>& workspace) {
+    sets.insert(std::make_pair(ConstraintType::Workspace, workspace));
+}
+
+template <std::size_t DIM>
+void BRY::SetDefinitions<DIM>::subdivide(uint32_t subdivision) {
+    if (subdivision < 2) {
+        WARN("Subdivision is less than 2 (no effect)");
+        return;
+    }
+    const std::multimap<ConstraintType, HyperRectangle<DIM>> original_sets = sets;
+    sets.clear();
+    for (const auto&[type, original_set] : original_sets) {
+        std::vector<HyperRectangle<DIM>> subd_sets_to_insert = original_set.subdivide(subdivision);
+        insertSets(type, subd_sets_to_insert.begin(), subd_sets_to_insert.end());
+    }
+}
+
+
+template <std::size_t DIM>
 BRY::ConstraintMatrices<DIM>::ConstraintMatrices(bry_int_t n_constraints, bry_int_t n_vars, bry_int_t barrier_deg_)
     : A(n_constraints, n_vars)
     , b(n_constraints)
@@ -74,38 +112,6 @@ void BRY::ConstraintMatrices<DIM>::applyFilter() {
 template <std::size_t DIM>
 BRY::Vector BRY::ConstraintMatrices<DIM>::computeRobustnessVec(const Vector& soln_vec) const {
     return A * soln_vec - b;
-}
-
-template <std::size_t DIM>
-std::pair<typename BRY::SetDefinitions<DIM>::ConstIterator, typename BRY::SetDefinitions<DIM>::ConstIterator> BRY::SetDefinitions<DIM>::getSets(ConstraintType set_type) const {
-    return std::make_pair(sets.lower_bound(set_type), sets.upper_bound(set_type));
-}
-
-template <std::size_t DIM>
-template <typename IT>
-void BRY::SetDefinitions<DIM>::insertSets(ConstraintType set_type, IT begin, IT end) {
-    for (IT it = begin; it != end; ++it) {
-        sets.insert(std::make_pair(set_type, *it));
-    }
-}
-
-template <std::size_t DIM>
-void BRY::SetDefinitions<DIM>::setWorkspace(const HyperRectangle<DIM>& workspace) {
-    sets.insert(std::make_pair(ConstraintType::Workspace, workspace));
-}
-
-template <std::size_t DIM>
-void BRY::SetDefinitions<DIM>::subdivide(uint32_t subdivision) {
-    if (subdivision < 2) {
-        WARN("Subdivision is less than 2 (no effect)");
-        return;
-    }
-    const std::multimap<ConstraintType, HyperRectangle<DIM>> original_sets = sets;
-    sets.clear();
-    for (const auto&[type, original_set] : original_sets) {
-        std::vector<HyperRectangle<DIM>> subd_sets_to_insert = original_set.subdivide(subdivision);
-        insertSets(type, subd_sets_to_insert.begin(), subd_sets_to_insert.end());
-    }
 }
 
 template <std::size_t DIM>
