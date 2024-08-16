@@ -127,7 +127,7 @@ struct PolyDynamicsProblem : public SetDefinitions<DIM> {
     public:
         /// @brief Compute the constraint matrices
         /// @return Constraint matrices object
-        virtual const ConstraintMatrices<DIM> getConstraintMatrices() const;
+        virtual const ConstraintMatrices<DIM> getConstraintMatrices();
 };
 
 }

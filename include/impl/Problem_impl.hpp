@@ -115,7 +115,7 @@ BRY::Vector BRY::ConstraintMatrices<DIM>::computeRobustnessVec(const Vector& sol
 }
 
 template <std::size_t DIM>
-const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices() const {
+const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices() {
     INFO("Creating constraint matrices");
 
     // Degree of the composed polynomial
