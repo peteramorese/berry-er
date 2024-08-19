@@ -29,7 +29,7 @@ void BRY::SynthesisResult<DIM>::removeFilter() {
 }
 
 template <std::size_t DIM>
-BRY::SynthesisResult<DIM> BRY::synthesize(const PolyDynamicsProblem<DIM>& problem, const std::string& solver_id) {
+BRY::SynthesisResult<DIM> BRY::synthesize(PolyDynamicsProblem<DIM>& problem, const std::string& solver_id) {
     auto constraints = problem.getConstraintMatrices();
     return synthesize(constraints, problem.time_horizon, solver_id);
 }

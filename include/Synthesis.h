@@ -27,7 +27,7 @@ struct SynthesisResult : public LPSolver::Result {
 };
 
 template <std::size_t DIM>
-SynthesisResult<DIM> synthesize(const PolyDynamicsProblem<DIM>& problem, const std::string& solver_id = "clp");
+SynthesisResult<DIM> synthesize(PolyDynamicsProblem<DIM>& problem, const std::string& solver_id = "clp");
 
 template <std::size_t DIM>
 SynthesisResult<DIM> synthesize(const ConstraintMatrices<DIM>& constraints, bry_int_t time_horizon, const std::string& solver_id = "clp");
