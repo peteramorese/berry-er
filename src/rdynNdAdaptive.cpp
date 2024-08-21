@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
     parser.enableHelp();
 
 
-    std::shared_ptr<PolyDynamicsProblem<DIM>> prob(new AdaptiveProblem<DIM>());
+    std::shared_ptr<AdaptiveProblem<DIM>> prob(new AdaptiveProblem<DIM>());
 
     if (dynamics_type.value() == "to_origin") {
         prob->dynamics.reset(new PolynomialDynamics<DIM>(makeUniformArray<bry_int_t, DIM>(1)));
@@ -89,14 +89,6 @@ int main(int argc, char** argv) {
         INFO("Workspace set:");
         printSetBounds(workspace);
     }
-    ////auto[half1, half2] = workspace.split(2, .02);
-    //auto[half1, half2] = workspace.splitByPercent(2, .6);
-    //DEBUG("Split half 1:");
-    //printSetBounds(half1);
-    //DEBUG("Split half 2:");
-    //printSetBounds(half2);
-
-
 
     // Init set
     // Set all higher dimensions to btw -0.1 and 0.1
@@ -227,8 +219,13 @@ int main(int argc, char** argv) {
         INFO("Done!");
     }
 
-    INFO("Solving...");
+    INFO("Solving prior...");
     Timer t("total_time");
+    SynthesisResult<DIM> guide_result = synthesize(*prob, solver_id.value());
+    INFO("Done! Solving adapted problem...");
+    prob->existing_result = &guide_result;
+    prob->max_constraints = 100000;
+    prob->actions = makeSubdivisonActions<DIM>();
     SynthesisResult<DIM> result = synthesize(*prob, solver_id.value());
     //if (adaptive) {
     //    result = synthesizeAdaptive(*prob, ada_iters.value(), ada_max_subdiv.value(), solver_id.value());

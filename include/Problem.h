@@ -57,13 +57,13 @@ template <std::size_t DIM>
 struct ConstraintMatrices {
     /// @brief Construct constraint matrices
     /// @param n_constraints Number of constriants
-    /// @param n_vars Number of variables (number of monomial coefficients)
+    /// @param n_vars Number of variables 
     /// @param barrier_deg_ Degree of the barrier
     ConstraintMatrices(bry_int_t n_constraints, bry_int_t n_vars, bry_int_t barrier_deg_);
 
     /// @brief Construct constraint matrices
     /// @param n_constraints Number of constriants
-    /// @param n_vars Number of variables (number of monomial coefficients)
+    /// @param n_vars Number of variables 
     /// @param barrier_deg_ Degree of the barrier
     /// @param filter Filter to apply to reduce the number of variables
     ConstraintMatrices(bry_int_t n_constraints, bry_int_t n_vars, bry_int_t barrier_deg_, const std::shared_ptr<MonomialFilter<DIM>>& filter_);
