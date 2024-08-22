@@ -12,7 +12,8 @@ struct Action {
     /// @param old_set Set to apply the transformation to
     /// @param new_sets Container to insert the new sets into
     /// @param normalized_split_point Point at which a set should be split
-    virtual void apply(const HyperRectangle<DIM>& old_set, const Eigen::Vector<bry_float_t, DIM>& normalized_split_point, std::vector<HyperRectangle<DIM>>& new_sets) const = 0;
+    /// @return `true` if action succeeded (or is valid for the given set) and `false` otherwise
+    virtual bool apply(const HyperRectangle<DIM>& old_set, const Eigen::Vector<bry_float_t, DIM>& normalized_split_point, std::vector<HyperRectangle<DIM>>& new_sets) const = 0;
 
     virtual ~Action() {}
 };
@@ -26,7 +27,7 @@ template <std::size_t DIM>
 struct Divide : public Action<DIM> {
     Divide(bry_int_t div_dim_) : div_dim(div_dim_) {}
 
-    virtual void apply(const HyperRectangle<DIM>& old_set, const Eigen::Vector<bry_float_t, DIM>& normalized_split_point, std::vector<HyperRectangle<DIM>>& new_sets) const override;
+    virtual bool apply(const HyperRectangle<DIM>& old_set, const Eigen::Vector<bry_float_t, DIM>& normalized_split_point, std::vector<HyperRectangle<DIM>>& new_sets) const override;
 
     bry_int_t div_dim = 0;
 
@@ -39,7 +40,7 @@ template <std::size_t DIM>
 struct IncreaseDegree : public Action<DIM> {
     IncreaseDegree(bry_int_t increase_) : increase(increase_) {}
 
-    virtual void apply(const HyperRectangle<DIM>& old_set, const Eigen::Vector<bry_float_t, DIM>& normalized_split_point, std::vector<HyperRectangle<DIM>>& new_sets) const override;
+    virtual bool apply(const HyperRectangle<DIM>& old_set, const Eigen::Vector<bry_float_t, DIM>& normalized_split_point, std::vector<HyperRectangle<DIM>>& new_sets) const override;
 
     /// @brief Amount to increase the degree by each time the action is applied
     bry_int_t increase = 1;
@@ -116,6 +117,13 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
 
             /// @brief Number of total constraints to not exceed the threshold
             bry_int_t n_total_constraints;
+
+            /// @brief Iterate through all the sets stored in this state and determine the set with the minimum robustness
+            /// that does not meet the vertex condition
+            void assignMinRobustnessSet();
+
+            /// @brief Compute the number of total constraints in this state
+            void assignNConstraints();
         };
 
         /// @brief State comparison for uniqueness
@@ -155,6 +163,20 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
 
         const Matrix& getPhim(bry_int_t bernstein_deg_incr);
         const Matrix& getPhip(bry_int_t bernstein_deg_incr);
+
+        std::string ctToStr(ConstraintType type) {
+            switch (type) {
+                case ConstraintType::Workspace:
+                    return "Wksp";
+                case ConstraintType::Init:
+                    return "Init";
+                case ConstraintType::Unsafe:
+                    return "Unsf";
+                case ConstraintType::Safe:
+                    return "Safe";
+            }
+            return std::string();
+        }
     private:
 
         /* Cached things used multiple times throughout the search */
@@ -176,7 +198,8 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
         std::set<State, UniquenessStateComparator> m_unique_states;
 
         /// @brief Set that orders the states that have not been expanded according to DFS objective
-        std::set<const State*, RobustnessStateComparator> m_expansion_set;
+        std::multiset<const State*, RobustnessStateComparator> m_expansion_set;
+        //std::list<const State*> m_expansion_set;
 
         bry_int_t m_solution_states_encountered = 0;
         const State* m_solution_state = nullptr;

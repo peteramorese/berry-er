@@ -7,18 +7,25 @@
 /* Actions */
 
 template <std::size_t DIM>
-void BRY::Divide<DIM>::apply(const HyperRectangle<DIM>& old_set, const Eigen::Vector<bry_float_t, DIM>& normalized_split_point, std::vector<HyperRectangle<DIM>>& new_sets) const {
-    std::pair<HyperRectangle<DIM>, HyperRectangle<DIM>> split_sets = old_set.splitByPercent(div_dim, normalized_split_point[div_dim]);
-    new_sets.reserve(2);
-    new_sets.push_back(std::move(split_sets.first));
-    new_sets.push_back(std::move(split_sets.second));
+bool BRY::Divide<DIM>::apply(const HyperRectangle<DIM>& old_set, const Eigen::Vector<bry_float_t, DIM>& normalized_split_point, std::vector<HyperRectangle<DIM>>& new_sets) const {
+    //bool within_0_and_1 = normalized_split_point.unaryExpr([](bry_float_t e){return e > 0.0 && e < 1.0;}).all();
+    bool within_0_and_1 = normalized_split_point[div_dim] > 0.0 && normalized_split_point[div_dim] < 1.0;
+    if (within_0_and_1) {
+        std::pair<HyperRectangle<DIM>, HyperRectangle<DIM>> split_sets = old_set.splitByPercent(div_dim, normalized_split_point[div_dim]);
+        new_sets.reserve(2);
+        new_sets.push_back(std::move(split_sets.first));
+        new_sets.push_back(std::move(split_sets.second));
+        return true;
+    } 
+    return false;
 }
 
 template <std::size_t DIM>
-void BRY::IncreaseDegree<DIM>::apply(const HyperRectangle<DIM>& old_set, const Eigen::Vector<bry_float_t, DIM>& normalized_split_point, std::vector<HyperRectangle<DIM>>& new_sets) const {
+bool BRY::IncreaseDegree<DIM>::apply(const HyperRectangle<DIM>& old_set, const Eigen::Vector<bry_float_t, DIM>& normalized_split_point, std::vector<HyperRectangle<DIM>>& new_sets) const {
     HyperRectangle<DIM> deg_incr_set = old_set;
     deg_incr_set.bernstein_deg_incr += increase;
     new_sets = {std::move(deg_incr_set)};
+    return true;
 }
 
 template <std::size_t DIM>
@@ -103,6 +110,27 @@ BRY::AdaptiveProblem<DIM>::State::State(const State& other)
 }
 
 template <std::size_t DIM>
+void BRY::AdaptiveProblem<DIM>::State::assignMinRobustnessSet() {
+    min_robustness = 1e100;
+    for (auto it = sets.begin(); it != sets.end(); ++it) {
+        const SetProperties& set_properties = (*it)->second;
+        // Exclude sets that meet the vertex condition since we can't do anything about those
+        if (set_properties.min_robustness < min_robustness && !set_properties.vertex_condition) {
+            min_robustness = (*it)->second.min_robustness;
+            min_robustness_set = it;
+        }
+    }
+}
+
+template <std::size_t DIM>
+void BRY::AdaptiveProblem<DIM>::State::assignNConstraints() {
+    n_total_constraints = 0;
+    for (const QSetIt& qset : sets) {
+        n_total_constraints += qset->second.n_constraints;
+    }
+}
+
+template <std::size_t DIM>
 const BRY::AdaptiveProblem<DIM>::State* BRY::AdaptiveProblem<DIM>::search() {
     // Convert the given problem into an initial state
     State init_state;
@@ -122,11 +150,11 @@ const BRY::AdaptiveProblem<DIM>::State* BRY::AdaptiveProblem<DIM>::search() {
             WARN("Duplicate set found in problem defintion (Set type: " << set.first << ")");
         }
 
-        if (qset_it->second.min_robustness < init_state.min_robustness) {
-            init_state.min_robustness = qset_it->second.min_robustness;
-        }
-        init_state.n_total_constraints += qset_it->second.n_constraints;
+        init_state.sets.insert(qset_it);
     }
+
+    init_state.assignMinRobustnessSet();
+    init_state.assignNConstraints();
 
     // Terminate of the initial state already exceeds the max constraints
     if (init_state.n_total_constraints > max_constraints) {
@@ -137,14 +165,23 @@ const BRY::AdaptiveProblem<DIM>::State* BRY::AdaptiveProblem<DIM>::search() {
     ASSERT(m_unique_states.empty(), "State container has not been cleared before search");
 
     auto it = m_unique_states.insert(std::move(init_state)).first;
+    //DEBUG("Inserting ptr: " << &*it);
+    //m_expansion_set.push_back(&*it);
     m_expansion_set.insert(&*it);
 
-    while (m_solution_states_encountered < max_ideal_solutions_found) {
+    while (m_solution_states_encountered < max_ideal_solutions_found && !m_expansion_set.empty()) {
+        //DEBUG("Expansion set: ");
+        //for (const State* s : m_expansion_set) {
+        //    DEBUG("- state: " << s << " robustness: " << s->min_robustness << " n_constraints: " << s->n_total_constraints);
+        //}
+
         // Pop the expansion state off the top
         auto top_it = m_expansion_set.begin();
         const State* expansion_state = *top_it;
+        //DEBUG("expanding ptr: " << expansion_state);
 
-        INFO_SMLN("Robustness: " << expansion_state->min_robustness);
+        INFO("Robustness: " << expansion_state->min_robustness << " | Number of constraints: " << expansion_state->n_total_constraints);
+        //INFO_SMLN("Robustness: " << expansion_state->min_robustness);
         // Remove state from the expansion set
         m_expansion_set.erase(top_it);
 
@@ -153,7 +190,10 @@ const BRY::AdaptiveProblem<DIM>::State* BRY::AdaptiveProblem<DIM>::search() {
             return m_solution_state;
         }
         expandState(expansion_state, actions);
+        //PAUSE;
     }
+    NEW_LINE;
+    //DEBUG("Exited while loop, returning...");
     return m_solution_state;
 }
 
@@ -171,7 +211,23 @@ void BRY::AdaptiveProblem<DIM>::expandState(const State* curr_state, const std::
 
         // Apply the action to the set and get the new sets
         std::vector<HyperRectangle<DIM>> new_sets;
-        action->apply((*new_state.min_robustness_set)->first.second, (*new_state.min_robustness_set)->second.normalized_split_point, new_sets);
+
+        const Set& min_robustness_set = (*new_state.min_robustness_set)->first;
+        const SetProperties& min_robustness_set_properties = (*new_state.min_robustness_set)->second;
+
+        // If the set has a vertex condition, applying actions will not improve anything, thus no need to expand
+        if (min_robustness_set_properties.vertex_condition) {
+            //DEBUG(" ----- vertex condition (skipping expansion)");
+            continue;
+        }
+
+        bool action_succcess = action->apply(min_robustness_set.second, min_robustness_set_properties.normalized_split_point, new_sets);
+
+        // If the action did not succeed, no new sets were generated, therefore no need to add states
+        if (!action_succcess) {
+            //DEBUG(" ----- action failure (skipping expansion)");
+            continue;
+        }
 
         // Subtract the constraints that the set was contributing 
         new_state.n_total_constraints -= (*new_state.min_robustness_set)->second.n_constraints;
@@ -206,20 +262,38 @@ void BRY::AdaptiveProblem<DIM>::expandState(const State* curr_state, const std::
             continue;
         }
 
+        // Temporarily set the min robustness iterator to allow valid copying; this will get reset if the state has not been seen before
+        new_state.min_robustness_set = new_state.sets.begin();
+
         // Check if the state is new to check if we need to calculate min robustness
         bool state_is_new = !m_unique_states.contains(new_state);
         //auto[unq_state_it, inserted] = m_unique_states.insert(std::move(new_state));
 
         // If the state has not been seen, then we need to calculate the new robustness values and add it to expansion set
         if (state_is_new) {
-            // Find the min robustness element
-            auto comp = [] (const QSetIt& lhs, const QSetIt& rhs) {return lhs->second.min_robustness < rhs->second.min_robustness;};
-            new_state.min_robustness_set = std::min_element(new_state.sets.begin(), new_state.sets.end(), comp);
-            // Reset the min robustness value to the robustness of the found element
-            new_state.min_robustness =  (*new_state.min_robustness_set)->second.min_robustness;
+            //// Find the min robustness element
+            //auto comp = [] (const QSetIt& lhs, const QSetIt& rhs) {return lhs->second.min_robustness < rhs->second.min_robustness;};
+            //new_state.min_robustness_set = std::min_element(new_state.sets.begin(), new_state.sets.end(), comp);
+            //// Reset the min robustness value to the robustness of the found element
+            //new_state.min_robustness = (*new_state.min_robustness_set)->second.min_robustness;
+            new_state.assignMinRobustnessSet();
+
             auto[it, inserted] = m_unique_states.insert(std::move(new_state));
             ASSERT(inserted, "New state has not been encountered before but was not inserted");
+            //m_expansion_set.push_back(&*it);
             m_expansion_set.insert(&*it);
+            //DEBUG("   Inserted ptr: " << &*it << " (expansion set size: " << m_expansion_set.size() << ")");
+            bry_int_t set_idx = 0;
+            bry_int_t min_set_idx = 0;
+            for (auto set_it = new_state.sets.begin(); set_it != new_state.sets.end(); ++set_it) {
+                //DEBUG("     set type: " << ctToStr(set->first.first) << ", normalized split point: " << set->second.normalized_split_point.transpose() << "     robustness: " << set->second.min_robustness);
+                //DEBUG("   - set " << set_idx << ", type: " << ctToStr((*set_it)->first.first) << "     robustness: " << (*set_it)->second.min_robustness << " vertex cond: " << (*set_it)->second.vertex_condition);
+                if (set_it == new_state.min_robustness_set) {
+                    min_set_idx = set_idx;
+                }
+                ++set_idx;
+            }
+            //DEBUG("   Min robustness set: " << min_set_idx << " with robustness: " << new_state.min_robustness);
         }
     }
 }
@@ -229,6 +303,7 @@ template <std::size_t DIM>
 void BRY::AdaptiveProblem<DIM>::proposeSolutionState(const State* state) {
     if (!!m_solution_state) { // If a solution state exists
         ++m_solution_states_encountered;
+        DEBUG("Proposing Solution " << m_solution_states_encountered << "/" << max_ideal_solutions_found << " robustness: " << state->min_robustness);
         if (state->min_robustness > m_solution_state->min_robustness) {
             m_solution_state = state;
         }
@@ -284,10 +359,19 @@ void BRY::AdaptiveProblem<DIM>::calculateRobustness(const Set& set, SetPropertie
     std::array<bry_int_t, DIM> coefficient_idx;
     auto[inf_of_p, vertex_cond] = BernsteinBasisTransform<DIM>::infBound(p, coefficient_idx);
 
+    //DEBUG("p degree: " << p.degree());
+    //DEBUG("coefficient idx: ");
+    //for (auto e : coefficient_idx) {
+    //    std::cout << e << " ";
+    //}
+    //NEW_LINE;
+
     properties.min_robustness = inf_of_p - lower_bound;
     properties.normalized_split_point = BernsteinBasisTransform<DIM>::ctrlPtOnUnitBox(coefficient_idx, p.degree());
+    //DEBUG("normalized split point: " << properties.normalized_split_point.transpose() << " vertex condition: " << vertex_cond);
     properties.vertex_condition = vertex_cond;
     properties.n_constraints = A.rows();
+    //PAUSE;
 }
 
 template <std::size_t DIM>

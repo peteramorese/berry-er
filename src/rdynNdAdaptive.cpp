@@ -206,9 +206,10 @@ int main(int argc, char** argv) {
         }
     }
 
+    std::shared_ptr<PolyDynamicsProblem<DIM>> prior_prob = std::make_shared<PolyDynamicsProblem<DIM>>(*prob);
     if (subd) {
         INFO("Subdividing in " << subd.value());
-        prob->subdivide(subd.value());
+        prior_prob->subdivide(subd.value());
     }
 
     if (export_matrices) {
@@ -221,10 +222,11 @@ int main(int argc, char** argv) {
 
     INFO("Solving prior...");
     Timer t("total_time");
-    SynthesisResult<DIM> guide_result = synthesize(*prob, solver_id.value());
+    SynthesisResult<DIM> prior_result = synthesize(*prior_prob, solver_id.value());
     INFO("Done! Solving adapted problem...");
-    prob->existing_result = &guide_result;
-    prob->max_constraints = 100000;
+    prob->existing_result = &prior_result;
+    prob->max_constraints = 10000;
+    prob->max_ideal_solutions_found = 5;
     prob->actions = makeSubdivisonActions<DIM>();
     SynthesisResult<DIM> result = synthesize(*prob, solver_id.value());
     //if (adaptive) {
