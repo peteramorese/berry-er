@@ -30,7 +30,9 @@ int main(int argc, char** argv) {
     lemon::Arg<lemon::ArgT::Value, bry_int_t> barrier_deg = parser.addDef<lemon::ArgT::Value, bry_int_t>().flag('d').key("deg").description("Barrier degree").required();
 	lemon::Arg<lemon::ArgT::Value, bry_int_t> deg_increase = parser.addDef<lemon::ArgT::Value, bry_int_t>().flag('i').key("deg-inc").defaultValue(0l).description("Barrier degree increase");
 	lemon::Arg<lemon::ArgT::Value, bry_int_t> subd = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("subd").flag('s').description("Barrier subdivision");
-	//lemon::Arg<lemon::ArgT::Value, bry_int_t> ada_iters = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ada-iters").defaultValue(1l).description("Number of adaptive subdivision iterations (ONLY FOR ADAPTIVE)");
+	lemon::Arg<lemon::ArgT::Value, bry_int_t> max_constraints = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("max-constraints").flag('c').defaultValue(10000).description("Maximum number of constraints in the adaptive problem");
+	lemon::Arg<lemon::ArgT::Value, bry_int_t> n_sols = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("nsols").defaultValue(10).description("Number of solutions of the search algorithm should compare against");
+	lemon::Arg<lemon::ArgT::Value, bry_int_t> iters = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("iters").defaultValue(1).description("Number of iterations to run the adaptive algorithm for");
 	//lemon::Arg<lemon::ArgT::Value, bry_int_t> ada_max_subdiv = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ada-max-subdiv").defaultValue(2l).description("Max number of sets divided each iteration (ONLY FOR ADAPTIVE)");
 	lemon::Arg<lemon::ArgT::Value, bry_int_t> time_steps = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ts").flag('t').defaultValue(10l).description("Number of time steps");
 	lemon::Arg<lemon::ArgT::Value, bry_float_t> boundary_width = parser.addDef<lemon::ArgT::Value, bry_float_t>().key("boundary-width").defaultValue(0.2).description("Width of the boundary region buffer (unsafe)");
@@ -224,11 +226,18 @@ int main(int argc, char** argv) {
     Timer t("total_time");
     SynthesisResult<DIM> prior_result = synthesize(*prior_prob, solver_id.value());
     INFO("Done! Solving adapted problem...");
-    prob->existing_result = &prior_result;
-    prob->max_constraints = 10000;
-    prob->max_ideal_solutions_found = 5;
+    //prob->existing_result = &prior_result;
+    prob->max_constraints = max_constraints.value();
+    prob->max_ideal_solutions_found = n_sols.value();
     prob->actions = makeSubdivisonActions<DIM>();
-    SynthesisResult<DIM> result = synthesize(*prob, solver_id.value());
+
+    SynthesisResult<DIM> result = prior_result;
+    for (bry_int_t iter = 0; iter < iters.value(); ++iter) {
+        INFO("Iteration " << iter + 1 << "/" << iters.value());
+        prob->existing_result = &prior_result;
+        result = synthesize(*prob, solver_id.value());
+    }
+
     //if (adaptive) {
     //    result = synthesizeAdaptive(*prob, ada_iters.value(), ada_max_subdiv.value(), solver_id.value());
     //} else {

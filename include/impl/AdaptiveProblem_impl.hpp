@@ -17,6 +17,15 @@ bool BRY::Divide<DIM>::apply(const HyperRectangle<DIM>& old_set, const Eigen::Ve
         new_sets.push_back(std::move(split_sets.second));
         return true;
     } 
+    //
+    {
+        std::pair<HyperRectangle<DIM>, HyperRectangle<DIM>> split_sets = old_set.split(div_dim);
+        new_sets.reserve(2);
+        new_sets.push_back(std::move(split_sets.first));
+        new_sets.push_back(std::move(split_sets.second));
+        return true;
+    }
+    //
     return false;
 }
 
@@ -48,6 +57,8 @@ BRY::AdaptiveProblem<DIM>::~AdaptiveProblem() {
 
 template <std::size_t DIM>
 const BRY::ConstraintMatrices<DIM> BRY::AdaptiveProblem<DIM>::getConstraintMatrices() {
+    reset();
+
     // If there is no existing result, it must be the first iteration and thus return the normal constraint matrices
     if (!existing_result) {
         return PolyDynamicsProblem<DIM>::getConstraintMatrices();
@@ -76,9 +87,11 @@ const BRY::ConstraintMatrices<DIM> BRY::AdaptiveProblem<DIM>::getConstraintMatri
     }
 
     const State* ideal_state = search(); 
-    INFO("Optimal state found (" << ideal_state->n_total_constraints << " constraints)");
+    INFO("Optimal state found (" << ideal_state->n_total_constraints << " constraints), robustness: " << ideal_state->min_robustness);
 
     BRY::ConstraintMatrices<DIM> constraint_matrices(ideal_state->n_total_constraints, m_n_cols, this->barrier_deg);
+
+    bry_float_t setwise_min_rob = 1e100;
 
     bry_int_t constraint_idx = 0;
     for (QSetIt qset_it : ideal_state->sets) {
@@ -86,7 +99,18 @@ const BRY::ConstraintMatrices<DIM> BRY::AdaptiveProblem<DIM>::getConstraintMatri
         constraint_matrices.A.block(constraint_idx, 0, A.rows(), A.cols()) = A;
         constraint_matrices.b.segment(constraint_idx, b.size()) = b;
         constraint_idx += A.rows();
+
+        //
+        SetProperties test;
+        calculateRobustness(qset_it->first, test);
+        DEBUG("set rob: " << test.min_robustness << " vertex cond: " << test.vertex_condition);
+        if (test.min_robustness < setwise_min_rob && !test.vertex_condition) {
+            setwise_min_rob = test.min_robustness;
+        }
+        //
     }
+    DEBUG("Min robustness of ideal solution: " << (constraint_matrices.A * m_soln_vec - constraint_matrices.b).minCoeff() << " with " << constraint_matrices.A.rows() << " constraints");
+    DEBUG("setwise min rob: " << setwise_min_rob);
 
     return constraint_matrices;
 }
@@ -115,6 +139,9 @@ void BRY::AdaptiveProblem<DIM>::State::assignMinRobustnessSet() {
     for (auto it = sets.begin(); it != sets.end(); ++it) {
         const SetProperties& set_properties = (*it)->second;
         // Exclude sets that meet the vertex condition since we can't do anything about those
+
+        /* DEBUG add back*/
+        //if (set_properties.min_robustness < min_robustness) {
         if (set_properties.min_robustness < min_robustness && !set_properties.vertex_condition) {
             min_robustness = (*it)->second.min_robustness;
             min_robustness_set = it;
@@ -216,8 +243,10 @@ void BRY::AdaptiveProblem<DIM>::expandState(const State* curr_state, const std::
         const SetProperties& min_robustness_set_properties = (*new_state.min_robustness_set)->second;
 
         // If the set has a vertex condition, applying actions will not improve anything, thus no need to expand
+        bool dbg_vert_cond = min_robustness_set_properties.vertex_condition;
         if (min_robustness_set_properties.vertex_condition) {
             //DEBUG(" ----- vertex condition (skipping expansion)");
+            //WARN("MIN ROB SET HAS VERTEX COND! PREV MIN ROB: " << new_state.min_robustness);
             continue;
         }
 
@@ -277,6 +306,10 @@ void BRY::AdaptiveProblem<DIM>::expandState(const State* curr_state, const std::
             //// Reset the min robustness value to the robustness of the found element
             //new_state.min_robustness = (*new_state.min_robustness_set)->second.min_robustness;
             new_state.assignMinRobustnessSet();
+            //if (dbg_vert_cond) {
+            //    WARN("new min rob: " << new_state.min_robustness);
+            //    PAUSE;
+            //}
 
             auto[it, inserted] = m_unique_states.insert(std::move(new_state));
             ASSERT(inserted, "New state has not been encountered before but was not inserted");
