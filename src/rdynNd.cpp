@@ -104,8 +104,8 @@ int main(int argc, char** argv) {
     // Edit the specific values for the 2D plane we're working in
     init_set.lower_bounds(0) = -0.8;
     init_set.upper_bounds(0) = -0.6;
-    init_set.lower_bounds(1) = 0.0;
-    init_set.upper_bounds(1) = 0.2;
+    init_set.lower_bounds(1) = -0.2;
+    init_set.upper_bounds(1) = 0.0;
     prob->sets.insert({ConstraintType::Init, init_set});
     if (verbose) {
         INFO("Initial set:");
@@ -227,9 +227,11 @@ int main(int argc, char** argv) {
         INFO("Done!");
     }
 
+    LPSolver solver(solver_id.value());
+
     INFO("Solving...");
     Timer t("total_time");
-    SynthesisResult<DIM> result = synthesize(*prob, solver_id.value());
+    SynthesisResult<DIM> result = synthesize(solver, *prob);
     //if (adaptive) {
     //    result = synthesizeAdaptive(*prob, ada_iters.value(), ada_max_subdiv.value(), solver_id.value());
     //} else {

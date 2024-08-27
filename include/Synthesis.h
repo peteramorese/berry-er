@@ -27,13 +27,13 @@ struct SynthesisResult : public LPSolver::Result {
 };
 
 template <std::size_t DIM>
-SynthesisResult<DIM> synthesize(PolyDynamicsProblem<DIM>& problem, const std::string& solver_id = "clp");
+SynthesisResult<DIM> synthesize(LPSolver& solver, PolyDynamicsProblem<DIM>& problem);
 
 template <std::size_t DIM>
-SynthesisResult<DIM> synthesize(const ConstraintMatrices<DIM>& constraints, bry_int_t time_horizon, const std::string& solver_id = "clp");
+SynthesisResult<DIM> synthesize(LPSolver& solver, const ConstraintMatrices<DIM>& constraints, bry_int_t time_horizon);
 
 template <std::size_t DIM>
-SynthesisResult<DIM> synthesizeAdaptive(PolyDynamicsProblem<DIM> problem, bry_int_t max_iter, bry_int_t subdiv_per_iter, const std::string& solver_id = "clp");
+SynthesisResult<DIM> synthesizeAdaptive(LPSolver& solver, PolyDynamicsProblem<DIM> problem, bry_int_t max_iter, bry_int_t subdiv_per_iter);
 
 void writeMatrixToFile(const Matrix& matrix, const std::string& filename);
 

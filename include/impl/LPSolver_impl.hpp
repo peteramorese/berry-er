@@ -30,7 +30,6 @@ void BRY::LPSolver::setConstraintMatrices(const Matrix& A, const Vector& b) {
     ASSERT(A.rows() == b.size(), "Number of rows in `A` does not match size of `b`");
 #endif
 
-    INFO("Constructing LP with " << A.cols() << " variables");
     m_solver->MakeNumVarArray(A.cols() - 2, -m_inf, m_inf, "b", &m_b);
 
 #ifdef BRY_ENABLE_BOUNDS_CHECK
@@ -109,4 +108,11 @@ BRY::Vector BRY::LPSolver::getSolnVector() const {
         soln_vec(++i) = m_gamma->solution_value();
         return soln_vec;
     }
+}
+
+void BRY::LPSolver::clear() {
+    m_solver->Clear();
+    m_b.clear();
+    m_objective = nullptr;
+    m_constraints_set = false;
 }

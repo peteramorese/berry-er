@@ -103,14 +103,14 @@ const BRY::ConstraintMatrices<DIM> BRY::AdaptiveProblem<DIM>::getConstraintMatri
         //
         SetProperties test;
         calculateRobustness(qset_it->first, test);
-        DEBUG("set rob: " << test.min_robustness << " vertex cond: " << test.vertex_condition);
+        //DEBUG("set rob: " << test.min_robustness << " vertex cond: " << test.vertex_condition);
         if (test.min_robustness < setwise_min_rob && !test.vertex_condition) {
             setwise_min_rob = test.min_robustness;
         }
         //
     }
-    DEBUG("Min robustness of ideal solution: " << (constraint_matrices.A * m_soln_vec - constraint_matrices.b).minCoeff() << " with " << constraint_matrices.A.rows() << " constraints");
-    DEBUG("setwise min rob: " << setwise_min_rob);
+    //DEBUG("Min robustness of ideal solution: " << (constraint_matrices.A * m_soln_vec - constraint_matrices.b).minCoeff() << " with " << constraint_matrices.A.rows() << " constraints");
+    //DEBUG("setwise min rob: " << setwise_min_rob);
 
     return constraint_matrices;
 }
@@ -207,7 +207,7 @@ const BRY::AdaptiveProblem<DIM>::State* BRY::AdaptiveProblem<DIM>::search() {
         const State* expansion_state = *top_it;
         //DEBUG("expanding ptr: " << expansion_state);
 
-        INFO("Robustness: " << expansion_state->min_robustness << " | Number of constraints: " << expansion_state->n_total_constraints);
+        INFO_SMLN("Robustness: " << std::setw(15) << expansion_state->min_robustness << " | Number of constraints: " << std::setw(8) << expansion_state->n_total_constraints << " | Number of solutions found: " << m_solution_states_encountered << " / " << max_ideal_solutions_found);
         //INFO_SMLN("Robustness: " << expansion_state->min_robustness);
         // Remove state from the expansion set
         m_expansion_set.erase(top_it);
@@ -336,7 +336,7 @@ template <std::size_t DIM>
 void BRY::AdaptiveProblem<DIM>::proposeSolutionState(const State* state) {
     if (!!m_solution_state) { // If a solution state exists
         ++m_solution_states_encountered;
-        DEBUG("Proposing Solution " << m_solution_states_encountered << "/" << max_ideal_solutions_found << " robustness: " << state->min_robustness);
+        //DEBUG("Proposing Solution " << m_solution_states_encountered << "/" << max_ideal_solutions_found << " robustness: " << state->min_robustness);
         if (state->min_robustness > m_solution_state->min_robustness) {
             m_solution_state = state;
         }
@@ -365,7 +365,7 @@ std::pair<BRY::Matrix, BRY::Vector> BRY::AdaptiveProblem<DIM>::calculateConstrai
 
         A.resize(coeffs.rows(), m_n_cols);
 
-        //            b         eta                                           gamma
+        //   b       eta                                         gamma
         A << coeffs, Vector::Constant(coeffs.rows(), eta_coeff), Vector::Zero(coeffs.rows());
         b = Vector::Constant(A.rows(), lower_bound);
     } else {
@@ -374,7 +374,7 @@ std::pair<BRY::Matrix, BRY::Vector> BRY::AdaptiveProblem<DIM>::calculateConstrai
 
         A.resize(coeffs.rows(), m_n_cols);
 
-        //            b         eta                            gamma
+        //   b       eta                          gamma
         A << coeffs, Vector::Zero(coeffs.rows()), Vector::Ones(coeffs.rows());
         b = Vector::Zero(A.rows());
     }
@@ -383,11 +383,24 @@ std::pair<BRY::Matrix, BRY::Vector> BRY::AdaptiveProblem<DIM>::calculateConstrai
 
 template <std::size_t DIM>
 void BRY::AdaptiveProblem<DIM>::calculateRobustness(const Set& set, SetProperties& properties) {
+    //Set copy_set = set;
+    //copy_set.second.bernstein_deg_incr = 200;
+
     auto[A, b] = calculateConstraintMatrices(set);
-    bry_float_t lower_bound = b[0];
+    bry_float_t eta_coeff = A(0, m_n_cols - 2);
+    bry_float_t gamma_coeff = A(0, m_n_cols - 1);
+
+    //DEBUG("eta coeffs: " << A(0, m_n_cols - 1) << " " << A(1, m_n_cols - 1) << " " << A(2, m_n_cols - 1) << " " << A(3, m_n_cols - 1) << " " << A(4, m_n_cols - 1));
+    //PAUSE;
+
+    // Subtract the given eta and gamma (adjusted by their respective coefficients) from the lower bound
+    bry_float_t lower_bound = b[0] - eta_coeff * existing_result->eta - gamma_coeff * existing_result->gamma;
+    //DEBUG("Set type: " << ctToStr(set.first) << " lower bound: " << lower_bound << "    (eta: " << existing_result->eta << ", gamma " << existing_result->gamma << ")");
 
     // Create a polynomial for determining the lower bound and control point index
-    Polynomial<DIM, Basis::Bernstein> p(A * m_soln_vec);
+    Matrix tf_coeff_matrix = A.block(0, 0, A.rows(), m_n_cols - 2); // Get the A matrix coefficients that correspond only to the barrier coefficient variables
+    Vector poly_coeffs = existing_result->b_values; // Get the barrier coefficient variables
+    Polynomial<DIM, Basis::Bernstein> p(tf_coeff_matrix * poly_coeffs);
 
     std::array<bry_int_t, DIM> coefficient_idx;
     auto[inf_of_p, vertex_cond] = BernsteinBasisTransform<DIM>::infBound(p, coefficient_idx);
@@ -399,11 +412,15 @@ void BRY::AdaptiveProblem<DIM>::calculateRobustness(const Set& set, SetPropertie
     //}
     //NEW_LINE;
 
+    //DEBUG("inf of p: " << inf_of_p);
     properties.min_robustness = inf_of_p - lower_bound;
+    //DEBUG(" is this negative?? " << properties.min_robustness);
+    
     properties.normalized_split_point = BernsteinBasisTransform<DIM>::ctrlPtOnUnitBox(coefficient_idx, p.degree());
     //DEBUG("normalized split point: " << properties.normalized_split_point.transpose() << " vertex condition: " << vertex_cond);
     properties.vertex_condition = vertex_cond;
     properties.n_constraints = A.rows();
+    //DEBUG(" barrier coeffs : " << existing_result->b_values.transpose());
     //PAUSE;
 }
 

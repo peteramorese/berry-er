@@ -50,6 +50,9 @@ class LPSolver {
         /// @brief Get the solution vector `v` that solves `Av >= b` once the LP has been solved
         /// @return Solution vector in the form (b_0, ..., b_m, eta, gamma)
         Vector getSolnVector() const;
+
+        /// @brief Remove all constraints and variables
+        void clear();
     private:
         BRY_INL bry_int_t nMonoms() const {return m_b.size();}
 

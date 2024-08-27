@@ -52,7 +52,6 @@ struct SetDefinitions {
         void subdivide(uint32_t subdivision);
 };
 
-
 template <std::size_t DIM>
 struct ConstraintMatrices {
     /// @brief Construct constraint matrices

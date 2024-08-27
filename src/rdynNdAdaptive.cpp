@@ -98,8 +98,8 @@ int main(int argc, char** argv) {
     // Edit the specific values for the 2D plane we're working in
     init_set.lower_bounds(0) = -0.8;
     init_set.upper_bounds(0) = -0.6;
-    init_set.lower_bounds(1) = 0.0;
-    init_set.upper_bounds(1) = 0.2;
+    init_set.lower_bounds(1) = -0.2;
+    init_set.upper_bounds(1) = 0.0;
     prob->sets.insert({ConstraintType::Init, init_set});
     if (verbose) {
         INFO("Initial set:");
@@ -212,6 +212,9 @@ int main(int argc, char** argv) {
     if (subd) {
         INFO("Subdividing in " << subd.value());
         prior_prob->subdivide(subd.value());
+        //
+        //prob->subdivide(subd.value());
+        //
     }
 
     if (export_matrices) {
@@ -222,9 +225,11 @@ int main(int argc, char** argv) {
         INFO("Done!");
     }
 
+    LPSolver solver(solver_id.value());
+
     INFO("Solving prior...");
     Timer t("total_time");
-    SynthesisResult<DIM> prior_result = synthesize(*prior_prob, solver_id.value());
+    SynthesisResult<DIM> prior_result = synthesize(solver, *prior_prob);
     INFO("Done! Solving adapted problem...");
     //prob->existing_result = &prior_result;
     prob->max_constraints = max_constraints.value();
@@ -232,10 +237,15 @@ int main(int argc, char** argv) {
     prob->actions = makeSubdivisonActions<DIM>();
 
     SynthesisResult<DIM> result = prior_result;
+    prob->existing_result = &prior_result;
+    //bry_float_t best_result_psafe = prior_result.p_safe;
     for (bry_int_t iter = 0; iter < iters.value(); ++iter) {
+        Timer t_i("iter_time");
         INFO("Iteration " << iter + 1 << "/" << iters.value());
-        prob->existing_result = &prior_result;
-        result = synthesize(*prob, solver_id.value());
+        result = synthesize(solver, *prob);
+        INFO("Done! (time: " << t_i.now(BRY::TimeUnit::s) << ")");
+        INFO("Probability of safety: " << result.p_safe);
+        prob->existing_result = &result;
     }
 
     //if (adaptive) {

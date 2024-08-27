@@ -29,14 +29,14 @@ void BRY::SynthesisResult<DIM>::removeFilter() {
 }
 
 template <std::size_t DIM>
-BRY::SynthesisResult<DIM> BRY::synthesize(PolyDynamicsProblem<DIM>& problem, const std::string& solver_id) {
+BRY::SynthesisResult<DIM> BRY::synthesize(LPSolver& solver, PolyDynamicsProblem<DIM>& problem) {
     auto constraints = problem.getConstraintMatrices();
-    return synthesize(constraints, problem.time_horizon, solver_id);
+    return synthesize(solver, constraints, problem.time_horizon);
 }
 
 template <std::size_t DIM>
-BRY::SynthesisResult<DIM> BRY::synthesize(const ConstraintMatrices<DIM>& constraints, bry_int_t time_horizon, const std::string& solver_id) {
-    LPSolver solver(solver_id);
+BRY::SynthesisResult<DIM> BRY::synthesize(LPSolver& solver, const ConstraintMatrices<DIM>& constraints, bry_int_t time_horizon) {
+    solver.clear();
     solver.setConstraintMatrices(constraints.A, constraints.b);
 
     BRY::SynthesisResult<DIM> result(constraints.barrier_deg, constraints.filter);
@@ -45,12 +45,12 @@ BRY::SynthesisResult<DIM> BRY::synthesize(const ConstraintMatrices<DIM>& constra
 }
 
 template <std::size_t DIM>
-BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(PolyDynamicsProblem<DIM> problem, bry_int_t max_iter, bry_int_t subdiv_per_iter, const std::string& solver_id) {
+BRY::SynthesisResult<DIM> BRY::synthesizeAdaptive(LPSolver& solver, PolyDynamicsProblem<DIM> problem, bry_int_t max_iter, bry_int_t subdiv_per_iter) {
     ASSERT(subdiv_per_iter >= 1, "subdiv_per_iter must be geq than 1");
 
     bry_int_t iter = 0;
     while (true) {
-        LPSolver solver(solver_id);
+        solver.clear();
         ConstraintMatrices<DIM> constraints = problem.getConstraintMatrices(true);
         solver.setConstraintMatrices(constraints.A, constraints.b);
 
