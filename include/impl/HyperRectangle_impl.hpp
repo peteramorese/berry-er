@@ -7,6 +7,9 @@
 
 #include <Eigen/Core>
 
+#define COMP_DIFF_TOL 1e-3
+//#define COMP_DIFF_TOL BRY_FLOAT_DIFF_TOL
+
 template <std::size_t DIM>
 BRY::HyperRectangle<DIM>::HyperRectangle(bry_float_t lower_default, bry_float_t upper_default)
     : lower_bounds(Eigen::Vector<bry_float_t, DIM>::Constant(lower_default))
@@ -23,8 +26,8 @@ BRY::HyperRectangle<DIM>::HyperRectangle(bry_float_t lower_default, bry_float_t 
 template <std::size_t DIM>
 bool BRY::HyperRectangle<DIM>::operator==(const HyperRectangle& other) const {
     return bernstein_deg_incr == other.bernstein_deg_incr
-        && ((lower_bounds - other.lower_bounds).norm() < BRY_FLOAT_DIFF_TOL)
-        && ((upper_bounds - other.upper_bounds).norm() < BRY_FLOAT_DIFF_TOL);
+        && ((lower_bounds - other.lower_bounds).norm() < COMP_DIFF_TOL)
+        && ((upper_bounds - other.upper_bounds).norm() < COMP_DIFF_TOL);
 }
 
 template <std::size_t DIM>
@@ -32,9 +35,9 @@ bool BRY::HyperRectangle<DIM>::operator<(const HyperRectangle& other) const {
     // Lexicographical comparison of two vectors
     auto lexLess = [](const auto& v1, const auto& v2) -> bool {
         for (bry_int_t i = 0; i < v1.size(); ++i) {
-            if (v1[i] < (v2[i] - BRY_FLOAT_DIFF_TOL)) {
+            if (v1[i] < (v2[i] - COMP_DIFF_TOL)) {
                 return true;
-            } else if (v1[i] > (v2[i] + BRY_FLOAT_DIFF_TOL)) {
+            } else if (v1[i] > (v2[i] + COMP_DIFF_TOL)) {
                 return false;
             }
         }

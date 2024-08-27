@@ -62,7 +62,7 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
 
         /// @brief Maximum number of solutions the search algorithms encounters before returning the best one.
         bry_int_t max_ideal_solutions_found = 10;
-        
+
         /// @brief If not null, adapt the subdivision to the existing barrier up to max_constraints
         const LPSolver::Result* existing_result = nullptr;
 
@@ -129,7 +129,7 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
 
         /// @brief State comparison for uniqueness
         struct UniquenessStateComparator {
-            BRY_INL bool operator()(State lhs, State rhs) const {
+            BRY_INL bool operator()(const State& lhs, const State& rhs) const {
                 UniquenessQSetItComparator comp;
                 return std::lexicographical_compare(lhs.sets.begin(), lhs.sets.end(), 
                                                     rhs.sets.begin(), rhs.sets.end(), comp);
@@ -165,7 +165,7 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
         const Matrix& getPhim(bry_int_t bernstein_deg_incr);
         const Matrix& getPhip(bry_int_t bernstein_deg_incr);
 
-        std::string ctToStr(ConstraintType type) {
+        std::string ctToStr(ConstraintType type) const {
             switch (type) {
                 case ConstraintType::Workspace:
                     return "Wksp";
@@ -178,6 +178,22 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
             }
             return std::string();
         }
+        void printSet(const QSetIt& qset) const {
+            const Set& set = qset->first;
+            const SetProperties& properties = qset->second;
+            if (!properties.vertex_condition) {
+                std::cout << "Set type: " << ctToStr(set.first);
+                std::cout << " l[" << std::setw(14) << set.second.lower_bounds[0] << ", " << std::setw(14) << set.second.lower_bounds[1] << "] ";
+                std::cout << " u[" << std::setw(14) << set.second.upper_bounds[0] << ", " << std::setw(14) << set.second.upper_bounds[1] << "] ";
+                std::cout << " rob: " << std::setw(14) << properties.min_robustness;
+                //if (properties.vertex_condition) {
+                //    std::cout << " VC";
+                //}
+                std::cout << "\n";
+
+            }
+        }
+
     private:
 
         /* Cached things used multiple times throughout the search */

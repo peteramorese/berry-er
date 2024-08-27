@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
         INFO("Subdividing in " << subd.value());
         prior_prob->subdivide(subd.value());
         //
-        //prob->subdivide(subd.value());
+        prob->subdivide(subd.value());
         //
     }
 
