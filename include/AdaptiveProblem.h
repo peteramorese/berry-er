@@ -120,7 +120,8 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
 
             /// @brief Iterate through all the sets stored in this state and determine the set with the minimum robustness
             /// that does not meet the vertex condition
-            void assignMinRobustnessSet();
+            /// @return `true` if succeeded, `false` if all sets had the vertex condition
+            bool assignMinRobustnessSet();
 
             /// @brief Compute the number of total constraints in this state
             void assignNConstraints();

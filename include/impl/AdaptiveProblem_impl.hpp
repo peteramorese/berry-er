@@ -66,7 +66,7 @@ const BRY::ConstraintMatrices<DIM> BRY::AdaptiveProblem<DIM>::getConstraintMatri
     INFO("Creating constraint matrices using existing result");
 
     if (actions.empty()) {
-        WARN("No set construction actions provided");
+        WARN("No set construction actions provided, returning default constraint matrices");
         return PolyDynamicsProblem<DIM>::getConstraintMatrices();
     }
 
@@ -87,6 +87,10 @@ const BRY::ConstraintMatrices<DIM> BRY::AdaptiveProblem<DIM>::getConstraintMatri
     }
 
     const State* ideal_state = search(); 
+    if (!ideal_state) {
+        WARN("Search failed, returning default constraint matrices");
+        return PolyDynamicsProblem<DIM>::getConstraintMatrices();
+    }
     INFO("Optimal state found (" << ideal_state->n_total_constraints << " constraints), robustness: " << ideal_state->min_robustness);
 
     BRY::ConstraintMatrices<DIM> constraint_matrices(ideal_state->n_total_constraints, m_n_cols, this->barrier_deg);
@@ -134,18 +138,28 @@ BRY::AdaptiveProblem<DIM>::State::State(const State& other)
 }
 
 template <std::size_t DIM>
-void BRY::AdaptiveProblem<DIM>::State::assignMinRobustnessSet() {
+bool BRY::AdaptiveProblem<DIM>::State::assignMinRobustnessSet() {
     min_robustness = 1e100;
+    bool all_vertex = true;
     for (auto it = sets.begin(); it != sets.end(); ++it) {
         const SetProperties& set_properties = (*it)->second;
         // Exclude sets that meet the vertex condition since we can't do anything about those
 
         /* DEBUG add back*/
         //if (set_properties.min_robustness < min_robustness) {
-        if (set_properties.min_robustness < min_robustness && !set_properties.vertex_condition) {
+        if (set_properties.vertex_condition) {
+            continue;
+        }
+        if (set_properties.min_robustness < min_robustness) {
+            all_vertex = false;
             min_robustness = (*it)->second.min_robustness;
             min_robustness_set = it;
         }
+    }
+    if (all_vertex) {
+        return false;
+    } else {
+        return true;
     }
 }
 
@@ -180,7 +194,11 @@ const BRY::AdaptiveProblem<DIM>::State* BRY::AdaptiveProblem<DIM>::search() {
         init_state.sets.insert(qset_it);
     }
 
-    init_state.assignMinRobustnessSet();
+    bool success = init_state.assignMinRobustnessSet();
+    if (!success) {
+        WARN("All sets in initial state have vertex condition (search terminating)");
+        return nullptr;
+    }
     init_state.assignNConstraints();
 
     // Terminate of the initial state already exceeds the max constraints
@@ -205,7 +223,6 @@ const BRY::AdaptiveProblem<DIM>::State* BRY::AdaptiveProblem<DIM>::search() {
         // Pop the expansion state off the top
         auto top_it = m_expansion_set.begin();
         const State* expansion_state = *top_it;
-        //DEBUG("expanding ptr: " << expansion_state);
 
         INFO_SMLN("Robustness: " << std::setw(15) << expansion_state->min_robustness << " | Number of constraints: " << std::setw(8) << expansion_state->n_total_constraints << " | Number of solutions found: " << m_solution_states_encountered << " / " << max_ideal_solutions_found);
         //INFO_SMLN("Robustness: " << expansion_state->min_robustness);
@@ -220,7 +237,6 @@ const BRY::AdaptiveProblem<DIM>::State* BRY::AdaptiveProblem<DIM>::search() {
         //PAUSE;
     }
     NEW_LINE;
-    //DEBUG("Exited while loop, returning...");
     return m_solution_state;
 }
 
