@@ -96,7 +96,7 @@ void BRY::ConstraintMatrices<DIM>::applyFilter() {
         } 
     }
 
-    Eigen::MatrixXd filtered_A(A.rows(), A.cols() - removed_cols);
+    Matrix filtered_A(A.rows(), A.cols() - removed_cols);
     bry_int_t new_idx = 0;
     for (bry_int_t old_idx = 0; old_idx < A.cols(); ++old_idx) {
         if (!filter_flags[old_idx]) {

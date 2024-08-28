@@ -30,6 +30,14 @@ class MonomialFilter {
         /// @return Idx of filtered polynomial
         BRY_INL const bry_int_t newWrappedIdx(bry_int_t old_wrapped_idx) const; 
 
+        /// @brief Apply the filter and remove rows corresponding to filtered monomials
+        /// @param matrix Matrix to be edited in-place
+        Matrix applyToCoeffMatrixRows(const Matrix& matrix) const;
+
+        /// @brief Apply the filter and remove cols corresponding to filtered monomials
+        /// @param matrix Matrix to be edited in-place
+        Matrix applyToCoeffMatrixCols(const Matrix& matrix) const;
+
     protected:
         /// @brief Must call this function in any derived class constructor
         void init();

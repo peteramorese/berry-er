@@ -43,6 +43,32 @@ const BRY::bry_int_t BRY::MonomialFilter<DIM>::newWrappedIdx(bry_int_t old_wrapp
 }
 
 template <std::size_t DIM>
+BRY::Matrix BRY::MonomialFilter<DIM>::applyToCoeffMatrixRows(const Matrix& matrix) const {
+    ASSERT(matrix.rows() == m_flags.size(), "Number of rows in matrix does not match number monomials filter should consider");
+    Matrix filtered_matrix(m_remaining_monoms, matrix.cols());
+    bry_int_t new_idx = 0;
+    for (bry_int_t old_idx = 0; old_idx < matrix.rows(); ++old_idx) {
+        if (!m_flags[old_idx]) {
+            filtered_matrix.row(new_idx++) = matrix.row(old_idx);
+        }
+    }
+    return filtered_matrix;
+}
+
+template <std::size_t DIM>
+BRY::Matrix BRY::MonomialFilter<DIM>::applyToCoeffMatrixCols(const Matrix& matrix) const {
+    ASSERT(matrix.cols() == m_flags.size(), "Number of cols in matrix does not match number monomials filter should consider");
+    Matrix filtered_matrix(matrix.rows(), m_remaining_monoms);
+    bry_int_t new_idx = 0;
+    for (bry_int_t old_idx = 0; old_idx < matrix.cols(); ++old_idx) {
+        if (!m_flags[old_idx]) {
+            filtered_matrix.col(new_idx++) = matrix.col(old_idx);
+        }
+    }
+    return filtered_matrix;
+}
+
+template <std::size_t DIM>
 BRY::DiagDegFilter<DIM>::DiagDegFilter(bry_int_t barrier_deg)
     : MonomialFilter<DIM>(barrier_deg)
 {

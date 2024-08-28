@@ -13,6 +13,10 @@ int main(int argc, char** argv) {
     DEBUG("Matrix w/o filter: \n" << h1.transformationMatrix(b_deg));
     NEW_LINE;
     DEBUG("Matrix w/ filter: \n" << h1.transformationMatrix(b_deg, &f));
+    NEW_LINE;
+    Matrix new_mat = f.applyToCoeffMatrixCols(h1.transformationMatrix(b_deg));
+    //new_mat = f.applyToCoeffMatrixRows(new_mat);
+    DEBUG("matrix w/ manual filter\n" << new_mat);
     //HyperRectangle<2> h2(.5000000000009, 1.2, 3);
 
     //DEBUG("h1 < h2? " << (h1 < h2));
