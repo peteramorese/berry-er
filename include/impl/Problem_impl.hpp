@@ -60,7 +60,6 @@ BRY::ConstraintMatrices<DIM>::ConstraintMatrices(bry_int_t n_constraints, bry_in
     , b(n_constraints)
     , barrier_deg(barrier_deg_)
     , constraint_sets(n_constraints)
-    , m_filter_applied(false)
 {
     ASSERT(A.cols() == pow(barrier_deg + 1, DIM) + 2, "Number of vars does not match barrier degree + 2");
 }
@@ -72,41 +71,8 @@ BRY::ConstraintMatrices<DIM>::ConstraintMatrices(bry_int_t n_constraints, bry_in
     , barrier_deg(barrier_deg_)
     , filter(filter_)
     , constraint_sets(n_constraints)
-    , m_filter_applied(false)
 {
     ASSERT(A.cols() == pow(barrier_deg + 1, DIM) + 2, "Number of vars does not match barrier degree + 2");
-}
-
-template <std::size_t DIM>
-void BRY::ConstraintMatrices<DIM>::applyFilter() {
-    if (m_filter_applied) {
-        return;
-    }
-
-    bry_int_t n_coeffs = pow(barrier_deg + 1, DIM);
-
-    bry_int_t removed_cols = 0;
-
-    std::vector<bry_int_t> filter_flags(A.cols(), false);
-
-    for (auto col_midx = mIdxW(DIM, barrier_deg + 1); !col_midx.last(); ++col_midx) {
-        if (filter->remove(col_midx.begin())) {
-            filter_flags[col_midx.inc().wrappedIdx()] = true;
-            ++removed_cols;
-        } 
-    }
-
-    Matrix filtered_A(A.rows(), A.cols() - removed_cols);
-    bry_int_t new_idx = 0;
-    for (bry_int_t old_idx = 0; old_idx < A.cols(); ++old_idx) {
-        if (!filter_flags[old_idx]) {
-            filtered_A.col(new_idx++) = A.col(old_idx);
-        }
-    }
-
-    A = filtered_A;
-
-    m_filter_applied = true;
 }
 
 template <std::size_t DIM>
@@ -118,40 +84,18 @@ template <std::size_t DIM>
 const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintMatrices() {
     INFO("Creating constraint matrices");
 
-    // Degree of the composed polynomial
-    bry_int_t p = dynamics->composedDegree(barrier_deg);
-    // Product F * E[Gamma]
-    Matrix F_expec_Gamma = dynamics->dynamicsPowerMatrix(barrier_deg) * noise->additiveNoiseMatrix(barrier_deg);
-    // Degree lift transform for the subtraction of F * E[Gamma] - B
-    Matrix deg_lift_tf = makeDegreeChangeTransform<DIM>(barrier_deg, p);
-
-    // Map containing all of the Phi_m transformation matrices for each bernstein conversion degree increase to prevent duplicate Phi matrices
-    std::map<bry_int_t, Matrix> Phi_m;
-    std::map<bry_int_t, Matrix> Phi_p;
+    initMatrixDefinitions();
 
     // Keep track of the number of constraints for each type
     std::array<bry_int_t, 4> n_constraints = makeUniformArray<bry_int_t, 4>(0);
     //bry_int_t n_ws_constraints = 0, n_init_constraints = 0, n_unsafe_constraints = 0, n_safe_constraints = 0;
 
     for (const auto&[set_type, set] : this->sets) {
-        // Safe set constraints use the Phi_p container, all other constraints use Phi_m
-        std::map<bry_int_t, Matrix>& Phi_matrix_container = set_type != ConstraintType::Safe ? Phi_m : Phi_p;
-
-        bry_int_t Phi_deg = set_type != ConstraintType::Safe ? barrier_deg : p;
-
-        /// Check if there is a Phi with the corresponding degree increase 
-        auto it = Phi_matrix_container.find(set.bernstein_deg_incr);
-        if (it == Phi_matrix_container.end()) {
-            it = Phi_matrix_container.emplace(set.bernstein_deg_incr, BernsteinBasisTransform<DIM>::pwrToBernMatrix(Phi_deg, set.bernstein_deg_incr)).first;
-        } 
-        // Count the number of constraints for matrix allocation later
-        n_constraints[set_type] += it->second.rows();
+        // Safe set constraints use the Phi_p container, all other constraints use Phi_m. Accumulate the number of rows
+        n_constraints[set_type] += (set_type != ConstraintType::Safe) ? getPhim(set.bernstein_deg_incr).rows() : getPhip(set.bernstein_deg_incr).rows();
     }
 
-    // Phi_m is guaranteed to atleast have one matrix in it, and all of the matrices must have the same number of columns, so look it up there
-    bry_int_t n_cols = Phi_m.begin()->second.cols() + 2;
-
-    BRY::ConstraintMatrices<DIM> constraint_matrices(std::accumulate(n_constraints.begin(), n_constraints.end(), 0), n_cols, barrier_deg);
+    BRY::ConstraintMatrices<DIM> constraint_matrices(std::accumulate(n_constraints.begin(), n_constraints.end(), 0), m_n_cols, barrier_deg, filter);
 
     bry_int_t constraint_idx = 0;
     for (typename SetDefinitions<DIM>::ConstIterator it = this->sets.begin(); it != this->sets.end(); ++it) {
@@ -164,10 +108,10 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
             // If the set is an initial set, then negate the b coefficients
             bry_float_t b_coeff_multiplier = (set_type == ConstraintType::Init) ? -1.0 : 1.0;
 
-            Matrix tf = b_coeff_multiplier * set.transformationMatrix(barrier_deg);
-            Matrix b_coeffs = Phi_m.at(set.bernstein_deg_incr) * tf;
+            auto tf = b_coeff_multiplier * set.transformationMatrix(barrier_deg);
+            Matrix b_coeffs = getPhim(set.bernstein_deg_incr) * tf;
 
-            Matrix A_mat_vals(b_coeffs.rows(), n_cols);
+            Matrix A_mat_vals(b_coeffs.rows(), m_n_cols);
 
             //            b         eta                                           gamma
             A_mat_vals << b_coeffs, Vector::Constant(b_coeffs.rows(), eta_coeff), Vector::Zero(b_coeffs.rows());
@@ -181,10 +125,10 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
 
             constraint_idx += A_mat_vals.rows();
         } else {
-            Matrix tf = -set.transformationMatrix(p) * (F_expec_Gamma - deg_lift_tf);
-            Matrix b_coeffs = Phi_p.at(set.bernstein_deg_incr) * tf;
+            auto tf = -set.transformationMatrix(m_p) * (m_F_expec_Gamma_minus_I);
+            Matrix b_coeffs = getPhip(set.bernstein_deg_incr) * tf;
 
-            Matrix A_mat_vals(b_coeffs.rows(), n_cols);
+            Matrix A_mat_vals(b_coeffs.rows(), m_n_cols);
 
             //            b         eta                            gamma
             A_mat_vals << b_coeffs, Vector::Zero(b_coeffs.rows()), Vector::Ones(b_coeffs.rows());
@@ -200,13 +144,43 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
         }
     }
 
-
-    constraint_matrices.filter = filter;
-    if (filter) {
-        INFO("Applying filter...");
-        constraint_matrices.applyFilter();
-        INFO("Done!");
-    }
     INFO("Created constraint matrices");
     return constraint_matrices;
+}
+
+template <std::size_t DIM>
+void BRY::PolyDynamicsProblem<DIM>::initMatrixDefinitions() {
+    // Degree of the composed polynomial
+    m_p = dynamics->composedDegree(barrier_deg);
+    // Product F * E[Gamma]
+    auto F_expec_Gamma = dynamics->dynamicsPowerMatrix(barrier_deg) * noise->additiveNoiseMatrix(barrier_deg);
+    // Subtract degree lift transform to get (F * E[Gamma] - I) * b
+    m_F_expec_Gamma_minus_I = F_expec_Gamma - makeDegreeChangeTransform<DIM>(barrier_deg, m_p);
+    // Number of optimization variables
+    if (!filter) {
+        m_n_cols = BRY::pow(barrier_deg + 1, DIM) + 2;
+    } else {
+        ASSERT(barrier_deg == filter->barrierDeg(), "Barrier degree used to consruct filter does not match that of the problem");
+        // If there is a filter, remove the coresponding columns
+        m_F_expec_Gamma_minus_I = filter->applyToCoeffMatrixCols(m_F_expec_Gamma_minus_I);
+        m_n_cols = filter->nRemainingMonoms();
+    }
+}
+
+template <std::size_t DIM>
+const BRY::Matrix& BRY::PolyDynamicsProblem<DIM>::getPhim(bry_int_t bernstein_deg_incr) {
+    auto it = m_Phi_m.find(bernstein_deg_incr);
+    if (it == m_Phi_m.end()) {
+        it = m_Phi_m.emplace(bernstein_deg_incr, BernsteinBasisTransform<DIM>::pwrToBernMatrix(this->barrier_deg, bernstein_deg_incr)).first;
+    } 
+    return it->second;
+}
+
+template <std::size_t DIM>
+const BRY::Matrix& BRY::PolyDynamicsProblem<DIM>::getPhip(bry_int_t bernstein_deg_incr) {
+    auto it = m_Phi_p.find(bernstein_deg_incr);
+    if (it == m_Phi_p.end()) {
+        it = m_Phi_p.emplace(bernstein_deg_incr, BernsteinBasisTransform<DIM>::pwrToBernMatrix(m_p, bernstein_deg_incr)).first;
+    } 
+    return it->second;
 }

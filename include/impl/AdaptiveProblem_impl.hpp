@@ -70,20 +70,13 @@ const BRY::ConstraintMatrices<DIM> BRY::AdaptiveProblem<DIM>::getConstraintMatri
         return PolyDynamicsProblem<DIM>::getConstraintMatrices();
     }
 
-    // Degree of the composed polynomial
-    m_p = this->dynamics->composedDegree(this->barrier_deg);
-    // Product F * E[Gamma]
-    m_F_expec_Gamma = this->dynamics->dynamicsPowerMatrix(this->barrier_deg) * this->noise->additiveNoiseMatrix(this->barrier_deg);
-    // Degree lift transform for the subtraction of F * E[Gamma] - B
-    m_deg_lift_tf = makeDegreeChangeTransform<DIM>(this->barrier_deg, m_p);
-    // Number of optimization variables
-    m_n_cols = BRY::pow(this->barrier_deg + 1, DIM) + 2;
+    this->initMatrixDefinitions();
 
     if (!!existing_result) {
-        m_soln_vec = Vector(m_n_cols);
+        m_soln_vec = Vector(this->m_n_cols);
         m_soln_vec.segment(0, existing_result->b_values.size()) = existing_result->b_values;
-        m_soln_vec[m_n_cols - 2] = existing_result->eta;
-        m_soln_vec[m_n_cols - 1] = existing_result->gamma;
+        m_soln_vec[this->m_n_cols - 2] = existing_result->eta;
+        m_soln_vec[this->m_n_cols - 1] = existing_result->gamma;
     }
 
     const State* ideal_state = search(); 
@@ -93,7 +86,7 @@ const BRY::ConstraintMatrices<DIM> BRY::AdaptiveProblem<DIM>::getConstraintMatri
     }
     INFO("Optimal state found (" << ideal_state->n_total_constraints << " constraints), robustness: " << ideal_state->min_robustness);
 
-    BRY::ConstraintMatrices<DIM> constraint_matrices(ideal_state->n_total_constraints, m_n_cols, this->barrier_deg);
+    BRY::ConstraintMatrices<DIM> constraint_matrices(ideal_state->n_total_constraints, this->m_n_cols, this->barrier_deg);
 
     bry_float_t setwise_min_rob = 1e100;
 
@@ -411,19 +404,19 @@ std::pair<BRY::Matrix, BRY::Vector> BRY::AdaptiveProblem<DIM>::calculateConstrai
         // If the set is an initial set, then negate the b coefficients
         bry_float_t coeff_multiplier = (set_type == ConstraintType::Init) ? -1.0 : 1.0;
 
-        Matrix tf = coeff_multiplier * set.second.transformationMatrix(this->barrier_deg);
-        Matrix coeffs = getPhim(set.second.bernstein_deg_incr) * tf;
+        auto tf = coeff_multiplier * set.second.transformationMatrix(this->barrier_deg);
+        Matrix coeffs = this->getPhim(set.second.bernstein_deg_incr) * tf;
 
-        A.resize(coeffs.rows(), m_n_cols);
+        A.resize(coeffs.rows(), this->m_n_cols);
 
         //   b       eta                                         gamma
         A << coeffs, Vector::Constant(coeffs.rows(), eta_coeff), Vector::Zero(coeffs.rows());
         b = Vector::Constant(A.rows(), lower_bound);
     } else {
-        Matrix tf = -set.second.transformationMatrix(m_p) * (m_F_expec_Gamma - m_deg_lift_tf);
-        Matrix coeffs = getPhip(set.second.bernstein_deg_incr) * tf;
+        auto tf = -set.second.transformationMatrix(this->m_p) * (m_F_expec_Gamma - m_deg_lift_tf);
+        Matrix coeffs = this->getPhip(set.second.bernstein_deg_incr) * tf;
 
-        A.resize(coeffs.rows(), m_n_cols);
+        A.resize(coeffs.rows(), this->m_n_cols);
 
         //   b       eta                          gamma
         A << coeffs, Vector::Zero(coeffs.rows()), Vector::Ones(coeffs.rows());
@@ -438,8 +431,8 @@ void BRY::AdaptiveProblem<DIM>::calculateRobustness(const Set& set, SetPropertie
     //copy_set.second.bernstein_deg_incr = 200;
 
     auto[A, b] = calculateConstraintMatrices(set);
-    bry_float_t eta_coeff = A(0, m_n_cols - 2);
-    bry_float_t gamma_coeff = A(0, m_n_cols - 1);
+    bry_float_t eta_coeff = A(0, this->m_n_cols - 2);
+    bry_float_t gamma_coeff = A(0, this->m_n_cols - 1);
 
     //DEBUG("eta coeffs: " << A(0, m_n_cols - 1) << " " << A(1, m_n_cols - 1) << " " << A(2, m_n_cols - 1) << " " << A(3, m_n_cols - 1) << " " << A(4, m_n_cols - 1));
     //PAUSE;
@@ -449,7 +442,7 @@ void BRY::AdaptiveProblem<DIM>::calculateRobustness(const Set& set, SetPropertie
     //DEBUG("Set type: " << ctToStr(set.first) << " lower bound: " << lower_bound << "    (eta: " << existing_result->eta << ", gamma " << existing_result->gamma << ")");
 
     // Create a polynomial for determining the lower bound and control point index
-    Matrix tf_coeff_matrix = A.block(0, 0, A.rows(), m_n_cols - 2); // Get the A matrix coefficients that correspond only to the barrier coefficient variables
+    Matrix tf_coeff_matrix = A.block(0, 0, A.rows(), this->m_n_cols - 2); // Get the A matrix coefficients that correspond only to the barrier coefficient variables
     Vector poly_coeffs = existing_result->b_values; // Get the barrier coefficient variables
     Polynomial<DIM, Basis::Bernstein> p(tf_coeff_matrix * poly_coeffs);
 
@@ -476,22 +469,4 @@ void BRY::AdaptiveProblem<DIM>::calculateRobustness(const Set& set, SetPropertie
     properties.n_constraints = A.rows();
     //DEBUG(" barrier coeffs : " << existing_result->b_values.transpose());
     //PAUSE;
-}
-
-template <std::size_t DIM>
-const BRY::Matrix& BRY::AdaptiveProblem<DIM>::getPhim(bry_int_t bernstein_deg_incr) {
-    auto it = m_Phi_m.find(bernstein_deg_incr);
-    if (it == m_Phi_m.end()) {
-        it = m_Phi_m.emplace(bernstein_deg_incr, BernsteinBasisTransform<DIM>::pwrToBernMatrix(this->barrier_deg, bernstein_deg_incr)).first;
-    } 
-    return it->second;
-}
-
-template <std::size_t DIM>
-const BRY::Matrix& BRY::AdaptiveProblem<DIM>::getPhip(bry_int_t bernstein_deg_incr) {
-    auto it = m_Phi_p.find(bernstein_deg_incr);
-    if (it == m_Phi_p.end()) {
-        it = m_Phi_p.emplace(bernstein_deg_incr, BernsteinBasisTransform<DIM>::pwrToBernMatrix(m_p, bernstein_deg_incr)).first;
-    } 
-    return it->second;
 }

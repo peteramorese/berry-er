@@ -28,6 +28,11 @@ void BRY::MonomialFilter<DIM>::init() {
 }
 
 template <std::size_t DIM>
+BRY::bry_int_t BRY::MonomialFilter<DIM>::barrierDeg() const {
+    return m_barrier_deg;
+}
+
+template <std::size_t DIM>
 BRY::bry_int_t BRY::MonomialFilter<DIM>::nRemainingMonoms() const {
     return m_remaining_monoms;
 }

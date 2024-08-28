@@ -17,6 +17,8 @@ class MonomialFilter {
         /// @return `true` if filter should remove and `false` otherwise
         virtual bool remove(const bry_int_t* exponent_vec) const = 0;
 
+        BRY_INL bry_int_t barrierDeg() const;
+
         /// @brief Get the number remaining monomials after the filter is applied
         /// @return Number of remaining monoms
         BRY_INL bry_int_t nRemainingMonoms() const; 

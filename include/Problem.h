@@ -78,18 +78,11 @@ struct ConstraintMatrices {
     /// @brief Degree of barrier
     const bry_int_t barrier_deg;
 
-    /// @brief Filter to apply to remove variables
-    std::shared_ptr<MonomialFilter<DIM>> filter;
+    /// @brief Filter applied to constraint matrices
+    const std::shared_ptr<const MonomialFilter<DIM>> filter;
 
     /// @brief Array with number elements equal to rows in `A` that stores pointers to the set that created the constraint
     std::vector<typename SetDefinitions<DIM>::ConstIterator> constraint_sets;
-
-    /// @brief Determine if a filter has been applied to the matrices
-    /// @return `true` if filter has been applied
-    BRY_INL bool isFilterApplied() const {return m_filter_applied;}
-
-    /// @brief Apply the current filter if one was supplied (otherwise do nothing)
-    void applyFilter();
 
     /// @brief Compute the constraint robustness vector equal to `Av - b` where `v` is the solution vector. If
     /// the solution vector adheres to the constraints, the elements of the returned vector will be non-negative
@@ -97,9 +90,6 @@ struct ConstraintMatrices {
     /// @return Robustness vector of size equal to number of rows in `A` where each element corresponds 
     /// to the robustness of a given constraint. 
     Vector computeRobustnessVec(const Vector& soln_vec) const;
-
-    private:
-        bool m_filter_applied;
 };
 
 template <std::size_t DIM>
@@ -127,6 +117,20 @@ struct PolyDynamicsProblem : public SetDefinitions<DIM> {
         /// @brief Compute the constraint matrices
         /// @return Constraint matrices object
         virtual const ConstraintMatrices<DIM> getConstraintMatrices();
+    
+    protected:
+        /// @brief Set `p`, `n_cols`, and `F_expec_Gamma_minus_I` before creating constraint matrices
+        void initMatrixDefinitions();
+        const Matrix& getPhim(bry_int_t bernstein_deg_incr);
+        const Matrix& getPhip(bry_int_t bernstein_deg_incr);
+
+    protected:
+        bry_int_t m_p;
+        bry_int_t m_n_cols;
+        std::map<bry_int_t, Matrix> m_Phi_m;
+        std::map<bry_int_t, Matrix> m_Phi_p;
+        Matrix m_F_expec_Gamma_minus_I;
+
 };
 
 }

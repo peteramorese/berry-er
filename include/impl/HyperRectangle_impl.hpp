@@ -61,12 +61,13 @@ bool BRY::HyperRectangle<DIM>::operator<(const HyperRectangle& other) const {
 template <std::size_t DIM>
 BRY::Matrix BRY::HyperRectangle<DIM>::transformationMatrix(bry_int_t m, const MonomialFilter<DIM>* filter) const {
 
+    BRY::bry_int_t n_monoms = pow(m + 1, DIM);
+
     Matrix T;
     if (!!filter) {
-        T.resize(filter->nRemainingMonoms(), filter->nRemainingMonoms());
+        T.resize(n_monoms, filter->nRemainingMonoms());
     } else {
-        BRY::bry_int_t m_monoms = pow(m + 1, DIM);
-        T.resize(m_monoms, m_monoms);
+        T.resize(n_monoms, n_monoms);
     }
     T.setZero();
 
@@ -76,9 +77,9 @@ BRY::Matrix BRY::HyperRectangle<DIM>::transformationMatrix(bry_int_t m, const Mo
     const std::vector<bool>* filter_flags = !filter ? nullptr : &filter->flags();
 
     for (auto row_midx = mIdxW(DIM, m + 1); !row_midx.last(); ++row_midx) {
-        if (!!filter && (*filter_flags)[row_midx.inc().wrappedIdx()]) {
-            continue;
-        }
+        //if (!!filter && (*filter_flags)[row_midx.inc().wrappedIdx()]) {
+        //    continue;
+        //}
 
         std::vector<bry_int_t> index_bounds(row_midx.size());
         for (std::size_t d = 0; d < DIM; ++d) {
@@ -100,7 +101,7 @@ BRY::Matrix BRY::HyperRectangle<DIM>::transformationMatrix(bry_int_t m, const Mo
             bry_int_t r = row_midx.inc().wrappedIdx();
             bry_int_t c = row_midx.inc().wrappedIdx() + col_midx.inc().wrappedIdx();
             if (!!filter) {
-                r = filter->newWrappedIdx(r);
+                //r = filter->newWrappedIdx(r);
                 c = filter->newWrappedIdx(c);
             }
 

@@ -14,7 +14,7 @@ template <std::size_t DIM>
 struct SynthesisResult : public LPSolver::Result {
     SynthesisResult() = default;
     SynthesisResult(bry_int_t barrier_deg_) : barrier_deg(barrier_deg_) {}
-    SynthesisResult(bry_int_t barrier_deg_, const std::shared_ptr<MonomialFilter<DIM>>& filter_) : barrier_deg(barrier_deg_), filter(filter_) {}
+    SynthesisResult(bry_int_t barrier_deg_, const std::shared_ptr<const MonomialFilter<DIM>>& filter_) : barrier_deg(barrier_deg_), filter(filter_) {}
 
     BRY_INL bool isFilterApplied() const {return (bool)filter;}
 
@@ -23,7 +23,7 @@ struct SynthesisResult : public LPSolver::Result {
 
     bry_int_t barrier_deg = 0;
 
-    std::shared_ptr<MonomialFilter<DIM>> filter = nullptr;
+    std::shared_ptr<const MonomialFilter<DIM>> filter = nullptr;
 };
 
 template <std::size_t DIM>

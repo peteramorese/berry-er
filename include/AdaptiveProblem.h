@@ -162,9 +162,6 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
         std::pair<Matrix, Vector> calculateConstraintMatrices(const Set& set);
         void calculateRobustness(const Set& set, SetProperties& properties);
 
-        const Matrix& getPhim(bry_int_t bernstein_deg_incr);
-        const Matrix& getPhip(bry_int_t bernstein_deg_incr);
-
         std::string ctToStr(ConstraintType type) const {
             switch (type) {
                 case ConstraintType::Workspace:
@@ -198,13 +195,9 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
 
         /* Cached things used multiple times throughout the search */
 
-        bry_int_t m_p;
-        bry_int_t m_n_cols;
         Vector m_soln_vec;
         Matrix m_F_expec_Gamma;
         Matrix m_deg_lift_tf;
-        std::map<bry_int_t, Matrix> m_Phi_m;
-        std::map<bry_int_t, Matrix> m_Phi_p;
 
         /* Search-related members */
 
