@@ -204,7 +204,7 @@ int main(int argc, char** argv) {
         if (filter.value() == "diagdeg") {
             prob->filter = std::make_shared<DiagDegFilter<DIM>>(barrier_deg.value());
         } else if (filter.value() == "oddsum") {
-            prob->filter = std::make_shared<OddSumFilter<DIM>>();
+            prob->filter = std::make_shared<OddSumFilter<DIM>>(barrier_deg.value());
         }
     }
 

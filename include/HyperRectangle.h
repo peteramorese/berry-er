@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MonomialFilter.h"
+
 #include "berry/Options.h"
 
 namespace BRY {
@@ -29,7 +31,7 @@ struct HyperRectangle {
         /// to within floating point threshold
         bool operator<(const HyperRectangle& other) const;
 
-        Matrix transformationMatrix(bry_int_t m) const;
+        Matrix transformationMatrix(bry_int_t m, const MonomialFilter<DIM>* filter = nullptr) const;
 
         BRY_INL Eigen::Vector<bry_float_t, DIM> scaleToUnit() const;
         BRY_INL Eigen::Vector<bry_float_t, DIM> translationToUnit() const;
