@@ -68,6 +68,7 @@ void BRY::LPSolver::setTimeLimit(int64_t time_limit_ms) {
 }
 
 BRY::LPSolver::Result BRY::LPSolver::solve(uint32_t time_horizon) {
+    INFO("Solving LP with " << m_solver->NumConstraints() << " constraints and " << m_solver->NumVariables() << " variables");
     m_objective = m_solver->MutableObjective();
 
     // Beta do not contribute to objective

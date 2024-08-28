@@ -98,20 +98,31 @@ const BRY::ConstraintMatrices<DIM> BRY::AdaptiveProblem<DIM>::getConstraintMatri
     bry_float_t setwise_min_rob = 1e100;
 
     bry_int_t constraint_idx = 0;
+
+    // Copy the sets into a vector to sort them by constraint type since it seems to speed up the optimization
+    std::vector<const Set*> sets_organized_by_ct;
+    sets_organized_by_ct.reserve(ideal_state->sets.size());
     for (QSetIt qset_it : ideal_state->sets) {
-        auto[A, b] = calculateConstraintMatrices(qset_it->first);
+        sets_organized_by_ct.push_back(&(qset_it->first));
+    }
+    // SORT HERE
+    //std::sort(sets_organized_by_ct.begin(), sets_organized_by_ct.end(), [](const Set* lhs, const Set* rhs){return lhs->first > rhs->first;});
+
+    //for (QSetIt qset_it : ideal_state->sets) {
+    for (const Set* set : sets_organized_by_ct) {
+        auto[A, b] = calculateConstraintMatrices(*set);
         constraint_matrices.A.block(constraint_idx, 0, A.rows(), A.cols()) = A;
         constraint_matrices.b.segment(constraint_idx, b.size()) = b;
         constraint_idx += A.rows();
 
-        //
-        SetProperties test;
-        calculateRobustness(qset_it->first, test);
-        //DEBUG("set rob: " << test.min_robustness << " vertex cond: " << test.vertex_condition);
-        if (test.min_robustness < setwise_min_rob && !test.vertex_condition) {
-            setwise_min_rob = test.min_robustness;
-        }
-        //
+        ////
+        //SetProperties test;
+        //calculateRobustness(qset_it->first, test);
+        ////DEBUG("set rob: " << test.min_robustness << " vertex cond: " << test.vertex_condition);
+        //if (test.min_robustness < setwise_min_rob && !test.vertex_condition) {
+        //    setwise_min_rob = test.min_robustness;
+        //}
+        ////
     }
     //DEBUG("Min robustness of ideal solution: " << (constraint_matrices.A * m_soln_vec - constraint_matrices.b).minCoeff() << " with " << constraint_matrices.A.rows() << " constraints");
     //DEBUG("setwise min rob: " << setwise_min_rob);

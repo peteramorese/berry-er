@@ -241,7 +241,8 @@ int main(int argc, char** argv) {
     //bry_float_t best_result_psafe = prior_result.p_safe;
     for (bry_int_t iter = 0; iter < iters.value(); ++iter) {
         Timer t_i("iter_time");
-        INFO("Iteration " << iter + 1 << "/" << iters.value());
+        NEW_LINE;
+        INFO(" --- Iteration   " << iter + 1 << " / " << iters.value() << "   --- ");
         result = synthesize(solver, *prob);
         INFO("Done! (time: " << t_i.now(BRY::TimeUnit::s) << ")");
         INFO("Probability of safety: " << result.p_safe);
