@@ -7,7 +7,7 @@
 
 #include <Eigen/Core>
 
-#define COMP_DIFF_TOL 1e-3
+#define COMP_DIFF_TOL 1e-4
 //#define COMP_DIFF_TOL BRY_FLOAT_DIFF_TOL
 
 template <std::size_t DIM>

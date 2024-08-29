@@ -74,6 +74,14 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
         void reset();
 
     private:
+        /* TODO */
+        ///// @brief Inequality lexicographic comparison in order: 
+        ///// 1) bernstein_deg_incr, 2) lower_bounds, 3) upper_bounds
+        ///// to within floating point threshold
+        //struct HyperRectangleComparator {
+        //    bool operator()(const HyperRectangle& lhs, const HyperRectangle& rhs) const;
+        //};
+
         /// @brief Wrapper around HyperRectangle for identifying unique sets
         using Set = std::pair<ConstraintType, HyperRectangle<DIM>>;
 
@@ -159,7 +167,6 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
 
         void proposeSolutionState(const State* state);
 
-        std::pair<Matrix, Vector> calculateConstraintMatrices(const Set& set);
         void calculateRobustness(const Set& set, SetProperties& properties);
 
         std::string ctToStr(ConstraintType type) const {

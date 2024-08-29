@@ -121,8 +121,11 @@ struct PolyDynamicsProblem : public SetDefinitions<DIM> {
     protected:
         /// @brief Set `p`, `n_cols`, and `F_expec_Gamma_minus_I` before creating constraint matrices
         void initMatrixDefinitions();
+
         const Matrix& getPhim(bry_int_t bernstein_deg_incr);
         const Matrix& getPhip(bry_int_t bernstein_deg_incr);
+
+        std::pair<Matrix, Vector> calculateSetConstraints(ConstraintType constraint_type, const HyperRectangle<DIM>& set);
 
     protected:
         bry_int_t m_p;

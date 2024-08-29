@@ -26,6 +26,7 @@ int main(int argc, char** argv) {
     lemon::Arg<lemon::ArgT::Value, std::string> filter = parser.addDef<lemon::ArgT::Value, std::string>().flag('f').key("filter").description("Select which filter to use").options({"diagdeg", "oddsum"});
     lemon::Arg<lemon::ArgT::Value, std::string> solver_id = parser.addDef<lemon::ArgT::Value, std::string>().key("solver").description("Solver ID").defaultValue("SCIP");
     lemon::Arg<lemon::ArgT::Value, std::string> dynamics_type = parser.addDef<lemon::ArgT::Value, std::string>().key("dynamics-type").description("Type of dynamics").defaultValue("to_origin").options({"to_origin", "random"});
+    lemon::Arg<lemon::ArgT::Value, std::string> action_type = parser.addDef<lemon::ArgT::Value, std::string>().flag('a').key("action-type").description("Type of actions to include in adaptive search").defaultValue("subd").options({"subd", "incr", "both"});
 	lemon::Arg<lemon::ArgT::Value, bry_int_t> dynamics_deg = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("dynamics-deg").defaultValue(1l).description("Degree of dynamics (e.g. 1 is linear, 2 is quadratic, etc.) (ONLY FOR `random` DYNAMICS)");
     lemon::Arg<lemon::ArgT::Value, bry_int_t> barrier_deg = parser.addDef<lemon::ArgT::Value, bry_int_t>().flag('d').key("deg").description("Barrier degree").required();
 	lemon::Arg<lemon::ArgT::Value, bry_int_t> deg_increase = parser.addDef<lemon::ArgT::Value, bry_int_t>().flag('i').key("deg-inc").defaultValue(0l).description("Barrier degree increase");
@@ -213,7 +214,7 @@ int main(int argc, char** argv) {
         INFO("Subdividing in " << subd.value());
         prior_prob->subdivide(subd.value());
         //
-        prob->subdivide(subd.value());
+        //prob->subdivide(subd.value());
         //
     }
 
@@ -234,11 +235,19 @@ int main(int argc, char** argv) {
     //prob->existing_result = &prior_result;
     prob->max_constraints = max_constraints.value();
     prob->max_ideal_solutions_found = n_sols.value();
-    prob->actions = makeSubdivisonActions<DIM>();
+
+    if (action_type.value() == "subd") {
+        prob->actions = makeSubdivisonActions<DIM>();
+    } else if (action_type.value() == "incr") {
+        prob->actions.push_back(new IncreaseDegree<DIM>(1));
+    } else if (action_type.value() == "both") {
+        prob->actions = makeSubdivisonActions<DIM>();
+        prob->actions.push_back(new IncreaseDegree<DIM>(1));
+    }
 
     SynthesisResult<DIM> result = prior_result;
     prob->existing_result = &prior_result;
-    //bry_float_t best_result_psafe = prior_result.p_safe;
+    bry_float_t best_result_psafe = prior_result.p_safe;
     for (bry_int_t iter = 0; iter < iters.value(); ++iter) {
         Timer t_i("iter_time");
         NEW_LINE;
@@ -246,6 +255,9 @@ int main(int argc, char** argv) {
         result = synthesize(solver, *prob);
         INFO("Done! (time: " << t_i.now(BRY::TimeUnit::s) << ")");
         INFO("Probability of safety: " << result.p_safe);
+        if (best_result_psafe < result.p_safe) {
+            best_result_psafe = result.p_safe;
+        }
         prob->existing_result = &result;
     }
 
@@ -257,7 +269,7 @@ int main(int argc, char** argv) {
     double total_time = t.now(BRY::TimeUnit::s);
     INFO("Done! (total time: " << total_time << ")");
     NEW_LINE;
-    INFO("Probability of safety: " << result.p_safe);
+    INFO("Probability of safety: " << best_result_psafe);
 
     printf("Eta = %.32f\n", result.eta);
     printf("Gamma = %.32f\n", result.gamma);

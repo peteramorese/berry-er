@@ -22,9 +22,7 @@ void BRY::MonomialFilter<DIM>::init() {
         m_flags[midx.inc().wrappedIdx()] = remove_monom;
         m_idx_map[midx.inc().wrappedIdx()] = m_remaining_monoms;
         m_remaining_monoms += !remove_monom;
-        DEBUG("Idx: " << midx.inc().wrappedIdx() << " remove: " << remove_monom);
     }
-    DEBUG("n remaining monoms: " << m_remaining_monoms);
 }
 
 template <std::size_t DIM>
