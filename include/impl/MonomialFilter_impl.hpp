@@ -13,19 +13,19 @@ BRY::MonomialFilter<DIM>::MonomialFilter(bry_int_t barrier_deg)
     : m_barrier_deg(barrier_deg)
     , m_flags(makeUniformArray<bry_int_t, DIM>(barrier_deg + 1))
     , m_idx_map(pow(barrier_deg + 1, DIM))
-{}
+{
+    m_flags.setZero();
+}
 
 template <std::size_t DIM>
 void BRY::MonomialFilter<DIM>::init() {
     m_remaining_monoms = 0;
     bool* flags_arr = m_flags.data();
-    DEBUG("flags size: " << m_flags.size());
     for (auto midx = mIdxW(DIM, m_barrier_deg + 1); !midx.last(); ++midx) {
         bool remove_monom = remove(midx.begin());
         flags_arr[midx.inc().wrappedIdx()] = remove_monom;
         m_idx_map[midx.inc().wrappedIdx()] = m_remaining_monoms;
         m_remaining_monoms += !remove_monom;
-        DEBUG("i: " << midx.inc().wrappedIdx() << " remove monom: " << remove_monom);
     }
 }
 
@@ -127,12 +127,10 @@ BRY::UniformRandomFilter<DIM>::UniformRandomFilter(bry_int_t barrier_deg, bry_in
             seen[idx_to_remove] = true;
             ++monoms_removed;
         }
-        DEBUG("hello");
     }
-    INFO("Done creating random filter");
+    INFO("Created random filter");
 
     this->init();
-    DEBUG("remaining monoms: " << this->m_remaining_monoms);
 }
 
 template <std::size_t DIM>
