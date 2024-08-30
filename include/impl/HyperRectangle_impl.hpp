@@ -74,7 +74,7 @@ BRY::Matrix BRY::HyperRectangle<DIM>::transformationMatrix(bry_int_t m, const Mo
     Eigen::Vector<bry_float_t, DIM> scale = scaleFromUnit();
     Eigen::Vector<bry_float_t, DIM> translation = translationFromUnit();
 
-    const std::vector<bool>* filter_flags = !filter ? nullptr : &filter->flags();
+    const bool* filter_flags = !filter ? nullptr : filter->flags().data();
 
     for (auto row_midx = mIdxW(DIM, m + 1); !row_midx.last(); ++row_midx) {
         //if (!!filter && (*filter_flags)[row_midx.inc().wrappedIdx()]) {
@@ -87,7 +87,7 @@ BRY::Matrix BRY::HyperRectangle<DIM>::transformationMatrix(bry_int_t m, const Mo
         }
 
         for (auto col_midx = mIdxBEW(index_bounds, m + 1); !col_midx.last(); ++col_midx) {
-            if (!!filter && (*filter_flags)[row_midx.inc().wrappedIdx() + col_midx.inc().wrappedIdx()]) {
+            if (!!filter && filter_flags[row_midx.inc().wrappedIdx() + col_midx.inc().wrappedIdx()]) {
                 continue;
             }
 

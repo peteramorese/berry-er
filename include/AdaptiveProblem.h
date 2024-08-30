@@ -70,6 +70,8 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
     public:
         virtual const ConstraintMatrices<DIM> getConstraintMatrices() override;
 
+        void setComparisonTolerance(bry_float_t tol);
+
         /// @brief Reset all search contents
         void reset();
 
@@ -133,6 +135,50 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
 
             /// @brief Compute the number of total constraints in this state
             void assignNConstraints();
+        };
+
+        struct UniquenessHyperrectangleComparator {
+            bry_float_t difference_tolerance = 1e-3;
+
+            bool operator()(const HyperRectangle<DIM>& lhs, const HyperRectangle<DIM>& rhs) const {
+                // Lexicographical comparison of two vectors
+                auto lexLess = [this](const auto& v1, const auto& v2) -> bool {
+                    for (bry_int_t i = 0; i < v1.size(); ++i) {
+                        if (v1[i] < (v2[i] - difference_tolerance)) {
+                            return true;
+                        } else if (v1[i] > (v2[i] + difference_tolerance)) {
+                            return false;
+                        }
+                    }
+                    return false;
+                };
+
+                if (lhs.bernstein_deg_incr < rhs.bernstein_deg_incr) {
+                    return true;
+                } else if (rhs.bernstein_deg_incr < lhs.bernstein_deg_incr) {
+                    return false;
+                } else if (lexLess(lhs.lower_bounds, rhs.lower_bounds)) {
+                    return true;
+                } else if (lexLess(rhs.lower_bounds, lhs.lower_bounds)) {
+                    return false;
+                } else if (lexLess(lhs.upper_bounds, rhs.upper_bounds)) {
+                    return true;
+                }
+                return false;
+            }
+        };
+
+        struct UniquenessSetComparator {
+            UniquenessHyperrectangleComparator hyperrect_comp = UniquenessHyperrectangleComparator{};
+
+            bool operator()(const Set& lhs, const Set& rhs) const {
+                if (lhs.first < rhs.first) {
+                    return true;
+                } else if (rhs.first < lhs.first) {
+                    return false;
+                } 
+                return hyperrect_comp(lhs.second, rhs.second);
+            }
         };
 
         /// @brief State comparison for uniqueness
@@ -209,7 +255,7 @@ class AdaptiveProblem : public PolyDynamicsProblem<DIM> {
         /* Search-related members */
 
         /// @brief Container holding all unique sets and their properties to avoid duplicates
-        std::map<Set, SetProperties> m_unique_sets;
+        std::map<Set, SetProperties, UniquenessSetComparator> m_unique_sets;
 
         /// @brief Container holding all unique states encountered during search. 
         std::set<State, UniquenessStateComparator> m_unique_states;

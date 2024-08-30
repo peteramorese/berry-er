@@ -124,6 +124,18 @@ const BRY::ConstraintMatrices<DIM> BRY::AdaptiveProblem<DIM>::getConstraintMatri
 }
 
 template <std::size_t DIM>
+void BRY::AdaptiveProblem<DIM>::setComparisonTolerance(bry_float_t tol) {
+    if (!m_unique_sets.empty()) {
+        WARN("Tried to set tolerance when set container is not empty. Call reset() before setting tolerance");
+        return;
+    }
+
+    UniquenessSetComparator set_comp;
+    set_comp.hyperrect_comp.difference_tolerance = tol;
+    m_unique_sets = std::map<Set, SetProperties, UniquenessSetComparator>(set_comp);
+}
+
+template <std::size_t DIM>
 void BRY::AdaptiveProblem<DIM>::reset() {
     m_unique_sets.clear();
     m_unique_states.clear();

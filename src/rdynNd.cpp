@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
     lemon::Arg<lemon::ArgT::Check> non_convex = parser.addDef<lemon::ArgT::Check>().key("non-conv").description("Solve the non-convex synthesis problem (default to convex)");
     //lemon::Arg<lemon::ArgT::Check> adaptive = parser.addDef<lemon::ArgT::Check>().flag('a').description("Use the adaptive subdivision algorithm");
     lemon::Arg<lemon::ArgT::Check> export_matrices = parser.addDef<lemon::ArgT::Check>().flag('e').description("Export the matrices to use external solvers");
-    lemon::Arg<lemon::ArgT::Value, std::string> filter = parser.addDef<lemon::ArgT::Value, std::string>().flag('f').key("filter").description("Select which filter to use").options({"diagdeg", "oddsum"});
+    lemon::Arg<lemon::ArgT::Value, std::string> filter = parser.addDef<lemon::ArgT::Value, std::string>().flag('f').key("filter").description("Select which filter to use").options({"diagdeg", "oddsum", "random"});
     lemon::Arg<lemon::ArgT::Value, std::string> solver_id = parser.addDef<lemon::ArgT::Value, std::string>().key("solver").description("Solver ID").defaultValue("SCIP");
     lemon::Arg<lemon::ArgT::Value, std::string> dynamics_type = parser.addDef<lemon::ArgT::Value, std::string>().key("dynamics-type").description("Type of dynamics").defaultValue("to_origin").options({"to_origin", "random"});
 	lemon::Arg<lemon::ArgT::Value, bry_int_t> dynamics_deg = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("dynamics-deg").defaultValue(1l).description("Degree of dynamics (e.g. 1 is linear, 2 is quadratic, etc.) (ONLY FOR `random` DYNAMICS)");
@@ -211,6 +211,8 @@ int main(int argc, char** argv) {
             prob->filter = std::make_shared<DiagDegFilter<DIM>>(barrier_deg.value());
         } else if (filter.value() == "oddsum") {
             prob->filter = std::make_shared<OddSumFilter<DIM>>(barrier_deg.value());
+        } else if (filter.value() == "random") {
+            prob->filter = std::make_shared<UniformRandomFilter<DIM>>(barrier_deg.value(), 50);
         }
     }
 

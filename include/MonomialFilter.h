@@ -25,7 +25,7 @@ class MonomialFilter {
 
         /// @brief Flags indicating if a monomial should be removed or not
         /// @return Get a flattened array of flags where `true` corresponds to `remove(wrapped_idx) = true`
-        BRY_INL const std::vector<bool>& flags() const; 
+        BRY_INL const Eigen::Tensor<bool, DIM>& flags() const; 
 
         /// @brief Get the new wrapped index of the filtered polynomial given the old wrapped index of the unfiltered polynomial
         /// @param old_wrapped_idx Idx of unfiltered polynomial
@@ -45,7 +45,7 @@ class MonomialFilter {
         void init();
 
     protected:
-        std::vector<bool> m_flags;
+        Eigen::Tensor<bool, DIM> m_flags;
         std::vector<bry_int_t> m_idx_map;
         const bry_int_t m_barrier_deg; 
         bry_int_t m_remaining_monoms;
@@ -64,7 +64,21 @@ template <std::size_t DIM>
 class OddSumFilter : public MonomialFilter<DIM> {
     public:
         OddSumFilter(bry_int_t barrier_deg);
+        OddSumFilter(bry_int_t barrier_deg, bry_int_t min_sum_exp_to_keep);
         virtual bool remove(const bry_int_t* exponent_vec) const override;
+
+    private:
+        bry_int_t m_min_sum_exp_to_keep = 3;
+};
+
+template <std::size_t DIM>
+class UniformRandomFilter : public MonomialFilter<DIM> {
+    public:
+        UniformRandomFilter(bry_int_t barrier_deg, bry_int_t monoms_to_remove);
+        virtual bool remove(const bry_int_t* exponent_vec) const override;
+
+    private:
+        bry_int_t m_monoms_to_remove;
 };
 
 ///// @brief Combine filters such that the element is removed only if all filters remove the element
