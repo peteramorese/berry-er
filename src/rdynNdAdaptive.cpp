@@ -36,10 +36,12 @@ int main(int argc, char** argv) {
 	lemon::Arg<lemon::ArgT::Value, bry_int_t> iters = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("iters").defaultValue(1).description("Number of iterations to run the adaptive algorithm for");
 	//lemon::Arg<lemon::ArgT::Value, bry_int_t> ada_max_subdiv = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ada-max-subdiv").defaultValue(2l).description("Max number of sets divided each iteration (ONLY FOR ADAPTIVE)");
 	lemon::Arg<lemon::ArgT::Value, bry_int_t> time_steps = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ts").flag('t').defaultValue(10l).description("Number of time steps");
+	lemon::Arg<lemon::ArgT::Value, bry_int_t> threads = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("threads").defaultValue(1l).description("Number of threads used for matrix operations");
 	lemon::Arg<lemon::ArgT::Value, bry_float_t> boundary_width = parser.addDef<lemon::ArgT::Value, bry_float_t>().key("boundary-width").defaultValue(0.2).description("Width of the boundary region buffer (unsafe)");
 	lemon::Arg<lemon::ArgT::Value, bry_float_t> comparison_tolerance = parser.addDef<lemon::ArgT::Value, bry_float_t>().key("comp-tol").description("Floating point tolerance used to compare the uniqueness of hyperrectangles");
     parser.enableHelp();
 
+    Eigen::setNbThreads(threads.value());
 
     std::shared_ptr<AdaptiveProblem<DIM>> prob(new AdaptiveProblem<DIM>());
 
@@ -235,7 +237,8 @@ int main(int argc, char** argv) {
     INFO("Solving prior...");
     Timer t("total_time");
     SynthesisResult<DIM> prior_result = synthesize(solver, *prior_prob);
-    INFO("Done! Solving adapted problem...");
+    INFO("Done! Probability of safety: " << prior_result.p_safe);
+    INFO("Solving adapted problem...");
     //prob->existing_result = &prior_result;
     prob->max_constraints = max_constraints.value();
     prob->max_ideal_solutions_found = n_sols.value();

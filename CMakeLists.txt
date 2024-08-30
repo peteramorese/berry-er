@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(berry)
+project(berryer)
 
 find_package (Eigen3 3.3.8 REQUIRED NO_MODULE)
 find_package(Threads REQUIRED)
 find_package(ortools REQUIRED)
+find_package(OpenMP REQUIRED)
 
 if(NOT DEFINED CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug)
@@ -31,6 +32,7 @@ set(BRYR_DEPENDENCY_INCLUDE_DIRS
 
 set(BRYR_DEPENDENCY_LIBS
     ortools::ortools
+    OpenMP::OpenMP_CXX
 )
 
 set(BRYR_INCLUDE_DIRS 
