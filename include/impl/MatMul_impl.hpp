@@ -8,7 +8,6 @@
 #include <cublas_v2.h>
 
 BRY::Matrix BRY::multiplyCUDA(const Matrix& A, const Matrix& B) {
-	std::cout << "TEST??" << std::endl;
 	if (A.cols() != B.rows()) {
 		throw std::invalid_argument("Matrix dimension mismatch");
 	}
@@ -18,7 +17,6 @@ BRY::Matrix BRY::multiplyCUDA(const Matrix& A, const Matrix& B) {
 	bry_int_t n = B.cols();
 
 	BRY::Matrix result(m, n);
-	
 	DEBUG("b4 malloc");
 	double *d_1, *d_2, *d_result;
     cudaMalloc((void**)&d_1, m * k * sizeof(bry_float_t));
@@ -32,15 +30,31 @@ BRY::Matrix BRY::multiplyCUDA(const Matrix& A, const Matrix& B) {
     cudaMemcpy(d_2, B.data(), k * n * sizeof(bry_float_t), cudaMemcpyHostToDevice);
 	DEBUG("af copy");
 
+	cublasStatus_t status;
+
     // Initialize cuBLAS
     cublasHandle_t handle;
-    cublasCreate(&handle);
+    status = cublasCreate(&handle);
+	if (status != CUBLAS_STATUS_SUCCESS) {
+		ERROR("cuBLAS create handle failed with status " << status);
+		cudaFree(d_1);
+		cudaFree(d_2);
+		cudaFree(d_result);
+		throw std::runtime_error("cuBLAS error");
+	}
 
     // Matrix multiplication: C = alpha * A * B + beta * C
 	DEBUG("b4 gemm");
-    double alpha = 1.0;
-    double beta = 0.0;
-    cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, d_1, m, d_2, k, &beta, d_result, m);
+    bry_float_t alpha = 1.0;
+    bry_float_t beta = 0.0;
+    status = cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, d_1, m, d_2, k, &beta, d_result, m);
+	if (status != CUBLAS_STATUS_SUCCESS) {
+		ERROR("cuBLAS gemm failed with status " << status);
+		cudaFree(d_1);
+		cudaFree(d_2);
+		cudaFree(d_result);
+		throw std::runtime_error("cuBLAS error");
+	}
 	DEBUG("af gemm");
 
     // Copy result from GPU to Eigen
