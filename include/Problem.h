@@ -118,6 +118,12 @@ struct PolyDynamicsProblem : public SetDefinitions<DIM> {
         /// @return Constraint matrices object
         virtual const ConstraintMatrices<DIM> getConstraintMatrices();
     
+        /// @brief Tighten the bounds on eta and gamma for a given barrier to get a better probability of safety
+        /// @param result Result to edit (in place)
+        /// @param eta_iterations Number of iterations to refine eta
+        /// @param gamma_iterations Number of iterations to refine gamma
+        void refineResult(LPSolver::Result& result, bry_int_t eta_iterations, bry_int_t gamma_iterations) const;
+
     protected:
         /// @brief Set `p`, `n_cols`, and `F_expec_Gamma_minus_I` before creating constraint matrices
         void initMatrixDefinitions();

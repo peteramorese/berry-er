@@ -14,7 +14,7 @@
 
 using namespace BRY;
 
-constexpr std::size_t DIM = 2;
+constexpr std::size_t DIM = 3;
 
 int main(int argc, char** argv) {
 
@@ -34,6 +34,11 @@ int main(int argc, char** argv) {
 	//lemon::Arg<lemon::ArgT::Value, bry_int_t> ada_max_subdiv = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ada-max-subdiv").defaultValue(2l).description("Max number of sets divided each iteration (ONLY FOR ADAPTIVE)");
 	lemon::Arg<lemon::ArgT::Value, bry_int_t> time_steps = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("ts").flag('t').defaultValue(10l).description("Number of time steps");
 	lemon::Arg<lemon::ArgT::Value, bry_int_t> threads = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("threads").defaultValue(1l).description("Number of threads used for matrix operations");
+
+    lemon::Arg<lemon::ArgT::Check> refine = parser.addDef<lemon::ArgT::Check>().flag('r').description("Refine the result");
+    lemon::Arg<lemon::ArgT::Value, bry_int_t> refine_eta_iters = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("reta").description("Number of iterations to refine eta").defaultValue(100);
+    lemon::Arg<lemon::ArgT::Value, bry_int_t> refine_gamma_iters = parser.addDef<lemon::ArgT::Value, bry_int_t>().key("rgamma").description("Number of iterations to refine gamma").defaultValue(50);
+
 	lemon::Arg<lemon::ArgT::Value, bry_float_t> boundary_width = parser.addDef<lemon::ArgT::Value, bry_float_t>().key("boundary-width").defaultValue(0.2).description("Width of the boundary region buffer (unsafe)");
     parser.enableHelp();
 
@@ -250,6 +255,10 @@ int main(int argc, char** argv) {
     printf("Gamma = %.32f\n", result.gamma);
     //INFO("Eta = " << result.eta << ", Gamma = " << result.gamma);
     INFO("Computation time: " << result.comp_time << "s");
+
+    if (refine) {
+        prob->refineResult(result, refine_eta_iters.value(), refine_gamma_iters.value());
+    }
 
     if (result.isFilterApplied()) {
         result.removeFilter();

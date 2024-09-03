@@ -406,9 +406,9 @@ void BRY::AdaptiveProblem<DIM>::calculateRobustness(const Set& set, SetPropertie
     //Set copy_set = set;
     //copy_set.second.bernstein_deg_incr = 200;
 
-    DEBUG("Calculating set constraints");
+    //DEBUG("Calculating set constraints");
     auto[A, b] = this->calculateSetConstraints(set.first, set.second);
-    DEBUG("done");
+    //DEBUG("done");
     bry_float_t eta_coeff = A(0, this->m_n_cols - 2);
     bry_float_t gamma_coeff = A(0, this->m_n_cols - 1);
 

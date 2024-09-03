@@ -111,6 +111,69 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     return constraint_matrices;
 }
 
+
+template <std::size_t DIM>
+void BRY::PolyDynamicsProblem<DIM>::refineResult(LPSolver::Result& result, bry_int_t eta_iterations, bry_int_t gamma_iterations) const {
+    auto createSolnVec = [&result] (bry_float_t eta, bry_float_t gamma) -> Vector {
+        Vector soln_vec(result.b_values.size() + 2);
+        soln_vec.segment(0, result.b_values.size()) = result.b_values;
+        soln_vec[soln_vec.size() - 2] = eta;
+        soln_vec[soln_vec.size() - 1] = gamma;
+        return soln_vec;
+    };
+
+    auto calculateRobustness = [&result] (const Matrix& A, const Vector& b, const Vector& soln_vec) -> bry_float_t {
+        return (A * soln_vec - b).minCoeff();
+    };
+
+    std::multimap<bry_float_t, HyperRectangle<DIM>> sorted_init_sets;
+    std::multimap<bry_float_t, HyperRectangle<DIM>> sorted_safe_sets;
+
+    // Create the initial solution vector from the quantities in the original result
+    Vector soln_vec = createSolnVec(result.eta, result.gamma);
+
+    auto refine = [&] (std::multimap<bry_float_t, HyperRectangle<DIM>>& sorted_container, bry_float_t max_iterations, ConstraintType constraint_type, const char* set_name) {
+        // Insert the init sets into the sorted container
+        for (auto[it, end_it] = this->getSets(constraint_type); it != end_it; ++it) {
+            auto[A, b] = calculateSetConstraints(constraint_type, it->second);
+            bry_float_t robustness = calculateRobustness(A, b, soln_vec);
+            sorted_container.insert(std::make_pair(robustness, it->second));
+        }
+
+        for (bry_int_t iters = 0; iters < eta_iterations; ++iters) {
+            // Retrieve the lowest robustness set
+            auto top_it = sorted_container.begin(); 
+            
+            // Subdivide it
+            std::vector<HyperRectangle<DIM>> new_sets = top_it->second.subdivide();
+
+            // Erase it from the container since we are inserting the subdivisions
+            sorted_container.erase(top_it);
+            
+            for (HyperRectangle<DIM>& new_set : new_sets) {
+                // Calclulate the robustness
+                auto[A, b] = calculateSetConstraints(ConstraintType::Init, new_set);
+                bry_float_t robustness = calculateRobustness(A, b, soln_vec);
+
+                // Insert the set into the container with its robustness 
+                sorted_container.insert(std::make_pair(robustness, std::move(new_set)));
+            }
+            INFO_SMLN("Refining " << set_name << " sets... | Robustness: " << std::setw(15) << sorted_init_sets.begin()->first << " | Number of sets: " << std::setw(8) << sorted_init_sets.size());
+        }
+    };
+
+    NEW_LINE;
+    INFO("Done!");
+
+    refine(sorted_init_sets, eta_iterations, ConstraintType::Init, "Init");
+    refine(sorted_safe_sets, gamma_iterations, ConstraintType::Safe, "Safe");
+
+    bry_float_t new_eta = result.eta - sorted_init_sets.begin()->first;
+    bry_float_t new_gamma = result.gamma - sorted_safe_sets.begin()->first;
+
+    INFO("New eta: " << new_eta << ", new gamma: " << new_gamma);
+}
+
 template <std::size_t DIM>
 void BRY::PolyDynamicsProblem<DIM>::initMatrixDefinitions() {
     // Degree of the composed polynomial
@@ -154,7 +217,7 @@ std::pair<BRY::Matrix, BRY::Vector> BRY::PolyDynamicsProblem<DIM>::calculateSetC
     Matrix A;
     Vector b;
     bry_float_t lower_bound = 0.0;
-    DEBUG("calculating set constraints for type: " << constraint_type);
+    //DEBUG("calculating set constraints for type: " << constraint_type);
     if (constraint_type != ConstraintType::Safe) {
         // Eta coeffs are 1 if the set is an initial set, otherwise they are zero
         bry_float_t eta_coeff = static_cast<bry_float_t>(constraint_type == ConstraintType::Init);
@@ -171,12 +234,12 @@ std::pair<BRY::Matrix, BRY::Vector> BRY::PolyDynamicsProblem<DIM>::calculateSetC
         A << coeffs, Vector::Constant(coeffs.rows(), eta_coeff), Vector::Zero(coeffs.rows());
         b = Vector::Constant(A.rows(), lower_bound);
     } else {
-        DEBUG("b4 tf");
+        //DEBUG("b4 tf");
         Matrix tf = set.transformationMatrix(this->m_p);
-        DEBUG("b4 prod");
+        //DEBUG("b4 prod");
         Matrix coeffs = -this->getPhip(set.bernstein_deg_incr) * tf * (m_F_expec_Gamma_minus_I);
         //Matrix coeffs = -this->getPhip(set.bernstein_deg_incr) * set.transformationMatrix(this->m_p) * (m_F_expec_Gamma_minus_I);
-        DEBUG("af prod");
+        //DEBUG("af prod");
 
         A.resize(coeffs.rows(), this->m_n_cols);
 
