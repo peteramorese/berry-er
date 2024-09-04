@@ -14,7 +14,7 @@
 
 using namespace BRY;
 
-constexpr std::size_t DIM = 3;
+constexpr std::size_t DIM = 2;
 
 int main(int argc, char** argv) {
 
@@ -249,7 +249,7 @@ int main(int argc, char** argv) {
     double total_time = t.now(BRY::TimeUnit::s);
     INFO("Done! (total time: " << total_time << ")");
     NEW_LINE;
-    INFO("Probability of safety: " << result.p_safe);
+    INFO("Probability of safety: " << result.pSafe());
 
     printf("Eta = %.32f\n", result.eta);
     printf("Gamma = %.32f\n", result.gamma);
@@ -258,11 +258,13 @@ int main(int argc, char** argv) {
 
     if (refine) {
         prob->refineResult(result, refine_eta_iters.value(), refine_gamma_iters.value());
+        INFO("Refined probability of safety: " << result.pSafe());
     }
 
     if (result.isFilterApplied()) {
         result.removeFilter();
     }
+
 
     writeMatrixToFile(result.b_values, "certificate_coeffs.txt");
 

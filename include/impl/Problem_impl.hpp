@@ -114,6 +114,10 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
 
 template <std::size_t DIM>
 void BRY::PolyDynamicsProblem<DIM>::refineResult(LPSolver::Result& result, bry_int_t eta_iterations, bry_int_t gamma_iterations) const {
+    //if (result.isFilterApplied()) {
+    //    result.removeFilter();
+    //}
+
     auto createSolnVec = [&result] (bry_float_t eta, bry_float_t gamma) -> Vector {
         Vector soln_vec(result.b_values.size() + 2);
         soln_vec.segment(0, result.b_values.size()) = result.b_values;
@@ -122,56 +126,128 @@ void BRY::PolyDynamicsProblem<DIM>::refineResult(LPSolver::Result& result, bry_i
         return soln_vec;
     };
 
-    auto calculateRobustness = [&result] (const Matrix& A, const Vector& b, const Vector& soln_vec) -> bry_float_t {
-        return (A * soln_vec - b).minCoeff();
+    auto calculatePolynomial = [&result, this] (ConstraintType ct, const HyperRectangle<DIM>& set) -> Polynomial<DIM, Basis::Bernstein> {
+        if (ct == ConstraintType::Init) {
+            Vector p_vector = -this->getPhim(set.bernstein_deg_incr) * set.transformationMatrix(this->barrier_deg, filter.get()) * result.b_values;
+            return Polynomial<DIM, Basis::Bernstein>(std::move(p_vector));
+        } else if (ct == ConstraintType::Safe) {
+            Matrix tf = set.transformationMatrix(this->m_p);
+            //DEBUG("b4 prod");
+            Matrix coeffs = -this->getPhip(set.bernstein_deg_incr) * tf * (m_F_expec_Gamma_minus_I);
+            Vector p_vector = coeffs * result.b_values;
+            //Vector p_vector = -this->getPhip(set.bernstein_deg_incr) * set.transformationMatrix(this->m_p) * (m_F_expec_Gamma_minus_I) * result.b_values;
+
+            //DEBUG("min coeff: " << p_vector.minCoeff());
+            return Polynomial<DIM, Basis::Bernstein>(std::move(p_vector));
+        }
+        throw std::invalid_argument("Unrecognized constraint type");
     };
 
-    std::multimap<bry_float_t, HyperRectangle<DIM>> sorted_init_sets;
-    std::multimap<bry_float_t, HyperRectangle<DIM>> sorted_safe_sets;
+    auto calculateRobustness = [&result] (ConstraintType ct, const Polynomial<DIM, Basis::Bernstein>& p) -> std::pair<bry_float_t, bool> {
+        // Returns lower bound (-eta, -gamma)
+        std::pair<bry_float_t, bool> inf_bound = BernsteinBasisTransform<DIM>::infBound(p);
+        if (ct == ConstraintType::Init) {
+            // Robustness = (0 if vertex condition) (-(-eta) - original_eta)
+            inf_bound.first = result.eta + inf_bound.first;
+            return inf_bound;
+        } else if (ct == ConstraintType::Safe) {
+            // Robustness = (0 if vertex condition) (original_gamma -(-gamma))
+            //DEBUG("upper bound: " << -inf_bound.first << " gamma: " << result.gamma);
+            inf_bound.first = result.gamma + inf_bound.first;
+            return inf_bound;
+        }
+        throw std::invalid_argument("Unrecognized constraint type");
+    };
+
+    // Maps robustness to the set flagged by if it obtains vertex condition
+    std::multimap<bry_float_t, std::pair<HyperRectangle<DIM>, bool>> sorted_init_sets;
+    std::multimap<bry_float_t, std::pair<HyperRectangle<DIM>, bool>> sorted_safe_sets;
 
     // Create the initial solution vector from the quantities in the original result
     Vector soln_vec = createSolnVec(result.eta, result.gamma);
 
-    auto refine = [&] (std::multimap<bry_float_t, HyperRectangle<DIM>>& sorted_container, bry_float_t max_iterations, ConstraintType constraint_type, const char* set_name) {
-        // Insert the init sets into the sorted container
-        for (auto[it, end_it] = this->getSets(constraint_type); it != end_it; ++it) {
-            auto[A, b] = calculateSetConstraints(constraint_type, it->second);
-            bry_float_t robustness = calculateRobustness(A, b, soln_vec);
-            sorted_container.insert(std::make_pair(robustness, it->second));
-        }
+    //
+    //Polynomial<DIM> p(result.b_values);
+    //HyperRectangle<DIM> init_set = this->sets.find(ConstraintType::Init)->second;
+    //p = transform(p, init_set.transformationMatrix(barrier_deg, filter.get()));
+    //auto p_bern = transform<DIM, Basis::Power, Basis::Bernstein>(-p, BernsteinBasisTransform<DIM>::pwrToBernMatrix(barrier_deg, 100));
+    //std::array<bry_int_t, DIM> coefficient_idx;
+    //auto[ub, vc] = BernsteinBasisTransform<DIM>::infBound(p_bern);
+    //DEBUG("max of p over init set: " << -ub << " vertex condition? " << vc);
+    //PAUSE;
+    //
 
-        for (bry_int_t iters = 0; iters < eta_iterations; ++iters) {
+    auto refine = [&] (std::multimap<bry_float_t, std::pair<HyperRectangle<DIM>, bool>>& sorted_container, bry_float_t max_iterations, ConstraintType constraint_type, const char* set_name) {
+        // Insert the init sets into the sorted container
+        //DEBUG("b4 insert");
+        for (auto[it, end_it] = this->getSets(constraint_type); it != end_it; ++it) {
+            //auto[A, b] = calculateSetConstraints(constraint_type, it->second);
+            //bry_float_t robustness = calculateRobustness(A, b, soln_vec);
+
+            auto[robustness, vertex_condition] = calculateRobustness(constraint_type, calculatePolynomial(constraint_type, it->second));
+            sorted_container.insert(std::make_pair(robustness, std::make_pair(it->second, vertex_condition)));
+            //DEBUG("robustness on insertion: " << robustness << " vertex condtion? " << vertex_condition);
+        }
+        //DEBUG("af insert");
+
+        for (bry_int_t iters = 0; iters < max_iterations; ++iters) {
             // Retrieve the lowest robustness set
             auto top_it = sorted_container.begin(); 
+            //DEBUG(" top_it robustness: " << top_it->first);
+
+            // If the lowest robustness set has the vertex condition, return, can't do anything better
+            if (top_it->second.second) {
+                break;
+            }
             
             // Subdivide it
-            std::vector<HyperRectangle<DIM>> new_sets = top_it->second.subdivide();
+            std::vector<HyperRectangle<DIM>> new_sets = top_it->second.first.subdivide();
 
             // Erase it from the container since we are inserting the subdivisions
             sorted_container.erase(top_it);
             
             for (HyperRectangle<DIM>& new_set : new_sets) {
                 // Calclulate the robustness
-                auto[A, b] = calculateSetConstraints(ConstraintType::Init, new_set);
-                bry_float_t robustness = calculateRobustness(A, b, soln_vec);
+                //auto[A, b] = calculateSetConstraints(ConstraintType::Init, new_set);
+                //DEBUG("A: \n" << A << "\n b: \n" << b);
+                //DEBUG("af calc new set constr");
+                auto[robustness, vertex_condition] = calculateRobustness(constraint_type, calculatePolynomial(constraint_type, new_set));
+                //auto p = calculatePolynomial(constraint_type, new_set);
+                //for (bry_int_t i = 0; i < p.tensor().size(); ++i) {
+                //    std::cout << *(p.tensor().data() + i) << " ";
+                //}
+                //NEW_LINE;
+                
+                sorted_container.insert(std::make_pair(robustness, std::make_pair(std::move(new_set), vertex_condition)));
+                //bry_float_t robustness = calculateRobustness(A, b, soln_vec);
+                //DEBUG("   constr new set: l" << new_set.lower_bounds[0] << ", " << new_set.lower_bounds[1] << " u" << new_set.upper_bounds[0] << ", " << new_set.upper_bounds[1]);
+                //DEBUG("   robustness of new set: " << robustness << " vc? " << vertex_condition);
+                //PAUSE;
 
                 // Insert the set into the container with its robustness 
-                sorted_container.insert(std::make_pair(robustness, std::move(new_set)));
+                //sorted_container.insert(std::make_pair(robustness, std::move(new_set)));
             }
-            INFO_SMLN("Refining " << set_name << " sets... | Robustness: " << std::setw(15) << sorted_init_sets.begin()->first << " | Number of sets: " << std::setw(8) << sorted_init_sets.size());
+            INFO_SMLN("Refining " << set_name << " sets (iteration " << std::setw(6) << iters + 1 << " / " << max_iterations << ") | Robustness: " << std::setw(15) << sorted_container.begin()->first << " | Number of sets: " << std::setw(6) << sorted_container.size());
         }
     };
-
-    NEW_LINE;
-    INFO("Done!");
 
     refine(sorted_init_sets, eta_iterations, ConstraintType::Init, "Init");
     refine(sorted_safe_sets, gamma_iterations, ConstraintType::Safe, "Safe");
 
+    NEW_LINE;
+    INFO("Done!");
+
+    INFO("Eta robustness: " << sorted_init_sets.begin()->first << ", gamma robustness: " << sorted_safe_sets.begin()->first);
     bry_float_t new_eta = result.eta - sorted_init_sets.begin()->first;
     bry_float_t new_gamma = result.gamma - sorted_safe_sets.begin()->first;
 
     INFO("New eta: " << new_eta << ", new gamma: " << new_gamma);
+    if (new_eta < result.eta) {
+        result.eta = new_eta;
+    }
+    if (new_gamma < result.gamma) {
+        result.gamma = new_gamma;
+    }
 }
 
 template <std::size_t DIM>
@@ -195,7 +271,7 @@ void BRY::PolyDynamicsProblem<DIM>::initMatrixDefinitions() {
 }
 
 template <std::size_t DIM>
-const BRY::Matrix& BRY::PolyDynamicsProblem<DIM>::getPhim(bry_int_t bernstein_deg_incr) {
+const BRY::Matrix& BRY::PolyDynamicsProblem<DIM>::getPhim(bry_int_t bernstein_deg_incr) const {
     auto it = m_Phi_m.find(bernstein_deg_incr);
     if (it == m_Phi_m.end()) {
         it = m_Phi_m.emplace(bernstein_deg_incr, BernsteinBasisTransform<DIM>::pwrToBernMatrix(this->barrier_deg, bernstein_deg_incr)).first;
@@ -204,7 +280,7 @@ const BRY::Matrix& BRY::PolyDynamicsProblem<DIM>::getPhim(bry_int_t bernstein_de
 }
 
 template <std::size_t DIM>
-const BRY::Matrix& BRY::PolyDynamicsProblem<DIM>::getPhip(bry_int_t bernstein_deg_incr) {
+const BRY::Matrix& BRY::PolyDynamicsProblem<DIM>::getPhip(bry_int_t bernstein_deg_incr) const {
     auto it = m_Phi_p.find(bernstein_deg_incr);
     if (it == m_Phi_p.end()) {
         it = m_Phi_p.emplace(bernstein_deg_incr, BernsteinBasisTransform<DIM>::pwrToBernMatrix(m_p, bernstein_deg_incr)).first;
@@ -213,7 +289,7 @@ const BRY::Matrix& BRY::PolyDynamicsProblem<DIM>::getPhip(bry_int_t bernstein_de
 }
 
 template <std::size_t DIM>
-std::pair<BRY::Matrix, BRY::Vector> BRY::PolyDynamicsProblem<DIM>::calculateSetConstraints(ConstraintType constraint_type, const HyperRectangle<DIM>& set) {
+std::pair<BRY::Matrix, BRY::Vector> BRY::PolyDynamicsProblem<DIM>::calculateSetConstraints(ConstraintType constraint_type, const HyperRectangle<DIM>& set) const {
     Matrix A;
     Vector b;
     bry_float_t lower_bound = 0.0;

@@ -128,16 +128,16 @@ struct PolyDynamicsProblem : public SetDefinitions<DIM> {
         /// @brief Set `p`, `n_cols`, and `F_expec_Gamma_minus_I` before creating constraint matrices
         void initMatrixDefinitions();
 
-        const Matrix& getPhim(bry_int_t bernstein_deg_incr);
-        const Matrix& getPhip(bry_int_t bernstein_deg_incr);
+        const Matrix& getPhim(bry_int_t bernstein_deg_incr) const;
+        const Matrix& getPhip(bry_int_t bernstein_deg_incr) const;
 
-        std::pair<Matrix, Vector> calculateSetConstraints(ConstraintType constraint_type, const HyperRectangle<DIM>& set);
+        std::pair<Matrix, Vector> calculateSetConstraints(ConstraintType constraint_type, const HyperRectangle<DIM>& set) const;
 
     protected:
         bry_int_t m_p;
         bry_int_t m_n_cols;
-        std::map<bry_int_t, Matrix> m_Phi_m;
-        std::map<bry_int_t, Matrix> m_Phi_p;
+        mutable std::map<bry_int_t, Matrix> m_Phi_m;
+        mutable std::map<bry_int_t, Matrix> m_Phi_p;
         Matrix m_F_expec_Gamma_minus_I;
 
 };

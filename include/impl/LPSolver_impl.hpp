@@ -8,6 +8,10 @@
 
 #include <ortools/linear_solver/linear_solver.pb.h>
 
+BRY::bry_float_t BRY::LPSolver::Result::pSafe() const {
+    return status == ort::MPSolver::ResultStatus::OPTIMAL ? (1.0 - (eta + time_horizon * gamma)) : 0.0;
+}
+
 BRY::LPSolver::LPSolver(const std::string& solver_id)
     : m_solver(ort::MPSolver::CreateSolver(solver_id))
     , m_constraints_set(false)
@@ -82,17 +86,12 @@ BRY::LPSolver::Result BRY::LPSolver::solve(uint32_t time_horizon) {
     Timer t("synthesis");
     m_result_status = m_solver->Solve();
 
-    Vector beta_values(nMonoms());
+    Vector b_values(nMonoms());
     for (bry_int_t i = 0; i < nMonoms(); ++i) {
-        beta_values(i) = m_b[i]->solution_value();
+        b_values(i) = m_b[i]->solution_value();
     }
 
-    bry_float_t p_safe = 0.0;
-    if (m_result_status == ort::MPSolver::ResultStatus::OPTIMAL) {
-        p_safe = 1.0 - m_objective->Value();
-    }
-
-    return Result{m_result_status, p_safe, m_eta->solution_value(), m_gamma->solution_value(), std::move(beta_values), t.now(TimeUnit::s)};
+    return Result(time_horizon, m_result_status, m_eta->solution_value(), m_gamma->solution_value(), std::move(b_values), t.now(TimeUnit::s));
 }
 
 BRY::Vector BRY::LPSolver::getSolnVector() const {
