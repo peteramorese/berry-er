@@ -10,20 +10,21 @@
 //using namespace BRY;
 int main(int argc, char** argv) {
     //Eigen::setNbThreads(16);
-    //Eigen::MatrixXd A = Eigen::MatrixXd::Random(10000, 50000);
-    //Eigen::MatrixXd B = Eigen::MatrixXd::Random(50000, 10000);
-    Eigen::MatrixXd A(4, 3);
-	A << 1, 2, 3,
-		4, 5, 6,
-		7, 8, 9,
-		10, 11, 12;
-    Eigen::MatrixXd B(3, 3);
-	B << 9, 8, 7,
-		6, 5 ,4,
-		3, 2, 1;
+    Eigen::MatrixXd A = Eigen::MatrixXd::Random(10, 50);
+    Eigen::MatrixXd B = Eigen::MatrixXd::Random(50, 10);
+    //Eigen::MatrixXd A(4, 3);
+	//A << 1, 2, 3,
+	//	4, 5, 6,
+	//	7, 8, 9,
+	//	10, 11, 12;
+    //Eigen::MatrixXd B(3, 3);
+	//B << 9, 8, 7,
+	//	6, 5 ,4,
+	//	3, 2, 1;
+
     //Eigen::MatrixXd C = A * B;
     Eigen::MatrixXd C = BRY_MATMUL(A, B);
-	std::cout << C;
+	//std::cout << C;
     
     //HyperRectangle<2> h1(.5, 1.2, 3);
     //HyperRectangle<2> h2(.1, 1.2, 4);

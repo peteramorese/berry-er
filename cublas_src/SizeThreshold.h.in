@@ -1,0 +1,2 @@
+#pragma once
+#define SIZE_THRESHOLD @SIZE_THRESHOLD@

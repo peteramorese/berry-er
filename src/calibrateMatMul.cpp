@@ -6,9 +6,13 @@
 #include "lemon/ArgParser.h"
 
 #include <iostream>
+#include <fstream>
 #include <iomanip>
 
 int main(int argc, char** argv) {
+
+#ifdef BRYR_USE_CUBLAS
+
     INFO("Calibrating GPU accelerated matrix multiplication");
 
     lemon::ArgParser parser(argc, argv);
@@ -28,7 +32,11 @@ int main(int argc, char** argv) {
     }
     INFO("Done! Benchmarking...");
 
+    int sz_thr;
     for (int dimension = 10; dimension < 10000; dimension += step.value()) {
+
+        sz_thr = dimension * dimension;
+
         Eigen::MatrixXd A(dimension, dimension);
         Eigen::MatrixXd B(dimension, dimension);
         A.setRandom();
@@ -66,10 +74,22 @@ int main(int argc, char** argv) {
         if (time_gpu < time_reg) {
             NEW_LINE;
             INFO("Size threshold found: " << dimension * dimension);
+            std::ofstream ofs("size_threshold", std::ios::trunc);
+
+            if (ofs.is_open()) {
+                ofs << sz_thr;
+                ofs.close();
+            } else {
+                ERROR("Error writing to 'size_threshold' file");
+            }
             return 0;
         }
     }
     
     WARN("Size threshold was not found between " << 100 << " and " << 10000 * 10000);
     return 1;
+#else
+    ERROR("BRYR_USE_CUBLAS not defined, did not build with cuBLAS capability");
+    return 1;
+#endif
 }

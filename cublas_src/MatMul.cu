@@ -4,6 +4,8 @@
 
 #ifdef BRYR_USE_CUBLAS
 
+#include "SizeThreshold.h"
+
 #include <exception>
 
 #include <cublas_v2.h>
@@ -16,6 +18,12 @@ BRY::Matrix BRY::multiplyCUDA(const Matrix& A, const Matrix& B) {
     bry_int_t m = A.rows();
     bry_int_t k = A.cols();
     bry_int_t n = B.cols();
+
+    // If the size of the matrices is less than the threshold, perform the calculation on the cpu
+    if (A.size() < SIZE_THRESHOLD && B.size() < SIZE_THRESHOLD) {
+        return A * B;
+    }
+
 
     BRY::Matrix result(m, n);
     double *d_1, *d_2, *d_result;
