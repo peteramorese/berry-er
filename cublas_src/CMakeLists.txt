@@ -1,0 +1,11 @@
+file(GLOB BRYR_CUBLAS_LIB RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.cu")
+
+add_library(bryrCUBLAS STATIC ${BRYR_CUBLAS_LIB})
+
+set_target_properties(bryrCUBLAS PROPERTIES
+    CUDA_SEPARABLE_COMPILATION ON
+    CUDA_STANDARD 14
+)
+
+target_include_directories(bryrCUBLAS PRIVATE ${BRYR_INCLUDE_DIRS})
+target_link_libraries(bryrCUBLAS ${BRYR_DEPENDENCY_LIBS})

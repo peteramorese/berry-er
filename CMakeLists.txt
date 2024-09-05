@@ -22,6 +22,11 @@ if(BRYR_USE_CUBLAS)
 	find_package(CUDA REQUIRED)
 	find_package(CUDAToolkit REQUIRED)
     add_definitions(-DBRYR_USE_CUBLAS)
+    enable_language(CUDA)
+
+    option(CUDA_ARCHITECTURES "Specify CUDA architectures (default: 75 (GeForce RTX 2070))" "75")
+    string(REPLACE " " ";" CUDA_ARCHITECTURES_LIST "${CUDA_ARCHITECTURES}")
+    set(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCHITECTURES_LIST})
 endif()
 
 if(NOT DEFINED CMAKE_BUILD_TYPE)
@@ -51,7 +56,6 @@ set(BRYR_DEPENDENCY_LIBS
     ortools::ortools
     #OpenMP::OpenMP_CXX
     #${BLAS_LIBRARIES}
-	${CUDA_LIBRARIES}
 )
 
 if(BRYR_USE_MKL)
@@ -61,9 +65,8 @@ endif()
 
 if(BRYR_USE_CUBLAS)
     set(BRYR_DEPENDENCY_INCLUDE_DIRS ${BRYR_DEPENDENCY_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS})
-    set(BRYR_DEPENDENCY_LIBS ${BRYR_DEPENDENCY_LIBS} ${CUDA_CUBLAS_LIBRARIES})
+    set(BRYR_DEPENDENCY_LIBS ${BRYR_DEPENDENCY_LIBS} ${CUDA_CUBLAS_LIBRARIES} CUDA::cudart)
 endif()
-
 
 set(BRYR_INCLUDE_DIRS 
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -71,5 +74,9 @@ set(BRYR_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/impl
     ${BRYR_DEPENDENCY_INCLUDE_DIRS}
 )
+
+if(BRYR_USE_CUBLAS)
+    add_subdirectory(cublas_src)
+endif()
 
 add_subdirectory(src)
