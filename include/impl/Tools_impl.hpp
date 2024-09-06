@@ -28,3 +28,24 @@ std::list<BRY::HyperRectangle<DIM>> BRY::makeRectBoundary(const HyperRectangle<D
     }
     return boundary_sets;
 }
+
+template <std::size_t DIM>
+static void BRY::removeFilterFromPVector(Vector& polynomial_vector, bry_int_t barrier_deg, const MonomialFilter<DIM>* filter) {
+    if (!filter) {
+        return;
+    }
+
+    bry_int_t n_coeffs = pow(barrier_deg + 1, DIM);
+    ASSERT(polynomial_vector.size() != n_coeffs, "Supplied coefficient vector is already in square-degree form (no filter is applied)");
+
+    Vector sq_coeffs = Vector::Zero(n_coeffs);
+    bry_int_t i = 0;
+
+    for (auto col_midx = mIdxW(DIM, barrier_deg + 1); !col_midx.last(); ++col_midx) {
+        if (!filter->remove(col_midx.begin())) {
+            sq_coeffs(col_midx.inc().wrappedIdx()) = polynomial_vector(i++);
+        }
+    }
+
+    polynomial_vector = sq_coeffs;
+}

@@ -203,7 +203,7 @@ int main(int argc, char** argv) {
 
     prob->time_horizon = time_steps.value();
     prob->barrier_deg = barrier_deg.value();
-    prob->degree_increase = deg_increase.value();
+    prob->increaseDegree(deg_increase.value());
     if (filter) {
         if (filter.value() == "diagdeg") {
             prob->filter = std::make_shared<DiagDegFilter<DIM>>(barrier_deg.value());
@@ -237,7 +237,7 @@ int main(int argc, char** argv) {
     INFO("Solving prior...");
     Timer t("total_time");
     SynthesisResult<DIM> prior_result = synthesize(solver, *prior_prob);
-    INFO("Done! Probability of safety: " << prior_result.p_safe);
+    INFO("Done! Probability of safety: " << prior_result.pSafe());
     INFO("Solving adapted problem...");
     //prob->existing_result = &prior_result;
     prob->max_constraints = max_constraints.value();
@@ -254,16 +254,16 @@ int main(int argc, char** argv) {
 
     SynthesisResult<DIM> result = prior_result;
     prob->existing_result = &prior_result;
-    bry_float_t best_result_psafe = prior_result.p_safe;
+    bry_float_t best_result_psafe = prior_result.pSafe();
     for (bry_int_t iter = 0; iter < iters.value(); ++iter) {
         Timer t_i("iter_time");
         NEW_LINE;
         INFO(" --- Iteration   " << iter + 1 << " / " << iters.value() << "   --- ");
         result = synthesize(solver, *prob);
         INFO("Done! (time: " << t_i.now(BRY::TimeUnit::s) << ")");
-        INFO("Probability of safety: " << result.p_safe);
-        if (best_result_psafe < result.p_safe) {
-            best_result_psafe = result.p_safe;
+        INFO("Probability of safety: " << result.pSafe());
+        if (best_result_psafe < result.pSafe()) {
+            best_result_psafe = result.pSafe();
         }
         prob->existing_result = &result;
     }

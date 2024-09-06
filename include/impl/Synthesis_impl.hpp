@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Synthesis.h"
+#include "Tools.h"
 
 #include "berry/BernsteinTransform.h"
 
@@ -9,23 +10,7 @@
 
 template <std::size_t DIM>
 void BRY::SynthesisResult<DIM>::removeFilter() {
-    if (!filter) {
-        return;
-    }
-
-    bry_int_t n_coeffs = pow(barrier_deg + 1, DIM);
-    ASSERT(b_values.size() != n_coeffs, "Supplied coefficient vector is already in square-degree form (no filter is applied)");
-
-    Vector sq_coeffs = Vector::Zero(n_coeffs);
-    bry_int_t i = 0;
-
-    for (auto col_midx = mIdxW(DIM, barrier_deg + 1); !col_midx.last(); ++col_midx) {
-        if (!filter->remove(col_midx.begin())) {
-            sq_coeffs(col_midx.inc().wrappedIdx()) = b_values(i++);
-        }
-    }
-
-    b_values = sq_coeffs;
+    removeFilterFromPVector(b_values, barrier_deg, filter.get());
 }
 
 template <std::size_t DIM>

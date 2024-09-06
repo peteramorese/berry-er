@@ -107,31 +107,38 @@ struct PolyDynamicsProblem : public SetDefinitions<DIM> {
     /// @brief Degree of the barrier certificate
     bry_int_t barrier_deg = 3;
 
-    /// @brief Increase the degree of the power-Bernstein conversion to reduce the conservativeness
-    bry_int_t degree_increase = 0;
-
     /// @brief Monomial filter to apply to the constraints. If nullptr, no filter will be applied
     std::shared_ptr<MonomialFilter<DIM>> filter = nullptr;
 
     public:
+        /// @brief Increase the degree of the power-berstein conversion
+        /// @param deg_incr 
+        void increaseDegree(bry_int_t deg_incr);
+
         /// @brief Compute the constraint matrices
         /// @return Constraint matrices object
         virtual const ConstraintMatrices<DIM> getConstraintMatrices();
     
+        /// @brief Tighten the bounds on eta and gamma for a given barrier to get a better probability of safety
+        /// @param result Result to edit (in place)
+        /// @param eta_iterations Number of iterations to refine eta
+        /// @param gamma_iterations Number of iterations to refine gamma
+        void refineResult(LPSolver::Result& result, bry_int_t eta_iterations, bry_int_t gamma_iterations) const;
+
     protected:
         /// @brief Set `p`, `n_cols`, and `F_expec_Gamma_minus_I` before creating constraint matrices
         void initMatrixDefinitions();
 
-        const Matrix& getPhim(bry_int_t bernstein_deg_incr);
-        const Matrix& getPhip(bry_int_t bernstein_deg_incr);
+        const Matrix& getPhim(bry_int_t bernstein_deg_incr) const;
+        const Matrix& getPhip(bry_int_t bernstein_deg_incr) const;
 
-        std::pair<Matrix, Vector> calculateSetConstraints(ConstraintType constraint_type, const HyperRectangle<DIM>& set);
+        std::pair<Matrix, Vector> calculateSetConstraints(ConstraintType constraint_type, const HyperRectangle<DIM>& set) const;
 
     protected:
         bry_int_t m_p;
         bry_int_t m_n_cols;
-        std::map<bry_int_t, Matrix> m_Phi_m;
-        std::map<bry_int_t, Matrix> m_Phi_p;
+        mutable std::map<bry_int_t, Matrix> m_Phi_m;
+        mutable std::map<bry_int_t, Matrix> m_Phi_p;
         Matrix m_F_expec_Gamma_minus_I;
 
 };

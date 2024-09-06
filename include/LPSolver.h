@@ -14,12 +14,12 @@ namespace ort = operations_research;
 class LPSolver {
     public:
         struct Result {
+            /// @brief Time horizon result applies to 
+            uint32_t time_horizon;
+        
             /// @brief Optimizer result
             ort::MPSolver::ResultStatus status;
 
-            /// @brief Probability of safety
-            bry_float_t p_safe;
-        
             /// @brief eta (init set constraint) and gamma (expected increase constraint)
             bry_float_t eta, gamma;
 
@@ -27,6 +27,9 @@ class LPSolver {
             Vector b_values;
 
             double comp_time;
+
+            /// @brief Probability of safety
+            bry_float_t pSafe() const;
         };
 
     public:
