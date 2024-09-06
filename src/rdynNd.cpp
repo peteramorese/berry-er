@@ -212,7 +212,7 @@ int main(int argc, char** argv) {
 
     prob->time_horizon = time_steps.value();
     prob->barrier_deg = barrier_deg.value();
-    prob->degree_increase = deg_increase.value();
+    prob->increaseDegree(deg_increase.value());
     if (filter) {
         if (filter.value() == "diagdeg") {
             prob->filter = std::make_shared<DiagDegFilter<DIM>>(barrier_deg.value());

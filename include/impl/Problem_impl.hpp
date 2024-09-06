@@ -111,6 +111,12 @@ const BRY::ConstraintMatrices<DIM> BRY::PolyDynamicsProblem<DIM>::getConstraintM
     return constraint_matrices;
 }
 
+template <std::size_t DIM>
+void BRY::PolyDynamicsProblem<DIM>::increaseDegree(bry_int_t deg_incr) {
+    for (auto&[ct, set] : this->sets) {
+        set.bernstein_deg_incr = deg_incr;
+    }
+}
 
 template <std::size_t DIM>
 void BRY::PolyDynamicsProblem<DIM>::refineResult(LPSolver::Result& result, bry_int_t eta_iterations, bry_int_t gamma_iterations) const {

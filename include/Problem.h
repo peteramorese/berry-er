@@ -107,13 +107,14 @@ struct PolyDynamicsProblem : public SetDefinitions<DIM> {
     /// @brief Degree of the barrier certificate
     bry_int_t barrier_deg = 3;
 
-    /// @brief Increase the degree of the power-Bernstein conversion to reduce the conservativeness
-    bry_int_t degree_increase = 0;
-
     /// @brief Monomial filter to apply to the constraints. If nullptr, no filter will be applied
     std::shared_ptr<MonomialFilter<DIM>> filter = nullptr;
 
     public:
+        /// @brief Increase the degree of the power-berstein conversion
+        /// @param deg_incr 
+        void increaseDegree(bry_int_t deg_incr);
+
         /// @brief Compute the constraint matrices
         /// @return Constraint matrices object
         virtual const ConstraintMatrices<DIM> getConstraintMatrices();
