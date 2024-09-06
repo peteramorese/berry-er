@@ -14,7 +14,7 @@
 
 using namespace BRY;
 
-constexpr std::size_t DIM = 2;
+constexpr std::size_t DIM = 3;
 
 int main(int argc, char** argv) {
 

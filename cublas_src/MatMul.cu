@@ -21,8 +21,10 @@ BRY::Matrix BRY::multiplyCUDA(const Matrix& A, const Matrix& B) {
 
     // If the size of the matrices is less than the threshold, perform the calculation on the cpu
     if (A.size() < SIZE_THRESHOLD && B.size() < SIZE_THRESHOLD) {
+        //DEBUG("CPU");
         return A * B;
     }
+    //DEBUG("GPU");
 
 
     BRY::Matrix result(m, n);

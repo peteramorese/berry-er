@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Problem.h"
+#include "MatMul.h"
 
 #include "berry/BernsteinTransform.h"
 
@@ -154,7 +155,7 @@ std::pair<BRY::Matrix, BRY::Vector> BRY::PolyDynamicsProblem<DIM>::calculateSetC
     Matrix A;
     Vector b;
     bry_float_t lower_bound = 0.0;
-    DEBUG("calculating set constraints for type: " << constraint_type);
+    //DEBUG("calculating set constraints for type: " << constraint_type);
     if (constraint_type != ConstraintType::Safe) {
         // Eta coeffs are 1 if the set is an initial set, otherwise they are zero
         bry_float_t eta_coeff = static_cast<bry_float_t>(constraint_type == ConstraintType::Init);
@@ -163,7 +164,7 @@ std::pair<BRY::Matrix, BRY::Vector> BRY::PolyDynamicsProblem<DIM>::calculateSetC
         // If the set is an initial set, then negate the b coefficients
         bry_float_t coeff_multiplier = (constraint_type == ConstraintType::Init) ? -1.0 : 1.0;
 
-        Matrix coeffs = coeff_multiplier * this->getPhim(set.bernstein_deg_incr) * set.transformationMatrix(this->barrier_deg, filter.get());
+        Matrix coeffs = coeff_multiplier * BRY_MATMUL(this->getPhim(set.bernstein_deg_incr), set.transformationMatrix(this->barrier_deg, filter.get()));
 
         A.resize(coeffs.rows(), this->m_n_cols);
 
@@ -171,12 +172,10 @@ std::pair<BRY::Matrix, BRY::Vector> BRY::PolyDynamicsProblem<DIM>::calculateSetC
         A << coeffs, Vector::Constant(coeffs.rows(), eta_coeff), Vector::Zero(coeffs.rows());
         b = Vector::Constant(A.rows(), lower_bound);
     } else {
-        DEBUG("b4 tf");
         Matrix tf = set.transformationMatrix(this->m_p);
-        DEBUG("b4 prod");
-        Matrix coeffs = -this->getPhip(set.bernstein_deg_incr) * tf * (m_F_expec_Gamma_minus_I);
+        Matrix tf_FGamma = BRY_MATMUL(set.transformationMatrix(this->m_p), m_F_expec_Gamma_minus_I);
+        Matrix coeffs = -BRY_MATMUL(this->getPhip(set.bernstein_deg_incr), tf_FGamma);
         //Matrix coeffs = -this->getPhip(set.bernstein_deg_incr) * set.transformationMatrix(this->m_p) * (m_F_expec_Gamma_minus_I);
-        DEBUG("af prod");
 
         A.resize(coeffs.rows(), this->m_n_cols);
 
